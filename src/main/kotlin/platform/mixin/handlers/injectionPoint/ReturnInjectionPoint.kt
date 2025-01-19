@@ -1,17 +1,27 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.handlers.injectionPoint
 
 import com.demonwav.mcdev.platform.mixin.reference.MixinSelector
-import com.intellij.codeInsight.daemon.impl.analysis.HighlightControlFlowUtil
+import com.demonwav.mcdev.util.hasImplicitReturnStatement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.openapi.project.Project
 import com.intellij.psi.JavaPsiFacade
@@ -25,8 +35,8 @@ import com.intellij.psi.PsiLambdaExpression
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiMethodReferenceExpression
 import com.intellij.psi.PsiReturnStatement
-import com.intellij.psi.PsiType
-import com.intellij.psi.controlFlow.ControlFlowUtil
+import com.intellij.psi.PsiTypes
+import com.intellij.psi.controlFlow.AnalysisCanceledException
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.AbstractInsnNode
 import org.objectweb.asm.tree.ClassNode
@@ -36,7 +46,7 @@ abstract class AbstractReturnInjectionPoint(private val tailOnly: Boolean) : Inj
     override fun createNavigationVisitor(
         at: PsiAnnotation,
         target: MixinSelector?,
-        targetClass: PsiClass
+        targetClass: PsiClass,
     ): NavigationVisitor {
         return MyNavigationVisitor(tailOnly)
     }
@@ -45,14 +55,14 @@ abstract class AbstractReturnInjectionPoint(private val tailOnly: Boolean) : Inj
         at: PsiAnnotation,
         target: MixinSelector?,
         targetClass: ClassNode,
-        mode: CollectVisitor.Mode
+        mode: CollectVisitor.Mode,
     ): CollectVisitor<PsiElement> {
         return MyCollectVisitor(at.project, mode, tailOnly)
     }
 
     override fun createLookup(
         targetClass: ClassNode,
-        result: CollectVisitor.Result<PsiElement>
+        result: CollectVisitor.Result<PsiElement>,
     ): LookupElementBuilder? {
         return null
     }
@@ -85,13 +95,13 @@ abstract class AbstractReturnInjectionPoint(private val tailOnly: Boolean) : Inj
                         return
                     }
                     val returnType = LambdaUtil.getFunctionalInterfaceReturnType(executableElement) ?: return
-                    if (returnType != PsiType.VOID) {
+                    if (returnType != PsiTypes.voidType()) {
                         return
                     }
                     body
                 }
                 is PsiMethod -> {
-                    if (executableElement.returnType != PsiType.VOID && !executableElement.isConstructor) {
+                    if (executableElement.returnType != PsiTypes.voidType() && !executableElement.isConstructor) {
                         return
                     }
                     executableElement.body ?: return
@@ -103,8 +113,13 @@ abstract class AbstractReturnInjectionPoint(private val tailOnly: Boolean) : Inj
             }
 
             val rBrace = codeBlockToAnalyze.rBrace ?: return
-            val controlFlow = HighlightControlFlowUtil.getControlFlowNoConstantEvaluate(codeBlockToAnalyze)
-            if (ControlFlowUtil.canCompleteNormally(controlFlow, 0, controlFlow.size)) {
+            val hasImplicitReturnStatement = try {
+                hasImplicitReturnStatement(codeBlockToAnalyze)
+            } catch (e: AnalysisCanceledException) {
+                return
+            }
+
+            if (hasImplicitReturnStatement) {
                 if (tailOnly) {
                     result.clear()
                 }
@@ -116,7 +131,7 @@ abstract class AbstractReturnInjectionPoint(private val tailOnly: Boolean) : Inj
     private class MyCollectVisitor(
         private val project: Project,
         mode: Mode,
-        private val tailOnly: Boolean
+        private val tailOnly: Boolean,
     ) : CollectVisitor<PsiElement>(mode) {
         override fun accept(methodNode: MethodNode) {
             val insns = methodNode.instructions ?: return

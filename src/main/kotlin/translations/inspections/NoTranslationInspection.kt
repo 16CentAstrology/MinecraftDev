@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.inspections
@@ -14,34 +24,43 @@ import com.demonwav.mcdev.translations.TranslationFiles
 import com.demonwav.mcdev.translations.identification.LiteralTranslationIdentifier
 import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.ProblemDescriptor
-import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.notification.Notification
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
-import com.intellij.psi.JavaElementVisitor
 import com.intellij.psi.PsiElementVisitor
-import com.intellij.psi.PsiLiteralExpression
+import com.intellij.uast.UastHintedVisitorAdapter
 import com.intellij.util.IncorrectOperationException
+import org.jetbrains.uast.UElement
+import org.jetbrains.uast.ULiteralExpression
+import org.jetbrains.uast.toUElementOfType
+import org.jetbrains.uast.visitor.AbstractUastNonRecursiveVisitor
 
 class NoTranslationInspection : TranslationInspection() {
     override fun getStaticDescription() =
         "Checks whether a translation key used in calls to <code>StatCollector.translateToLocal()</code>, " +
             "<code>StatCollector.translateToLocalFormatted()</code> or <code>I18n.format()</code> exists."
 
-    override fun buildVisitor(holder: ProblemsHolder): PsiElementVisitor = Visitor(holder)
+    private val typesHint: Array<Class<out UElement>> = arrayOf(ULiteralExpression::class.java)
 
-    private class Visitor(private val holder: ProblemsHolder) : JavaElementVisitor() {
-        override fun visitLiteralExpression(expression: PsiLiteralExpression) {
-            val result = LiteralTranslationIdentifier().identify(expression)
-            if (result != null && result.text == null) {
+    override fun buildVisitor(holder: ProblemsHolder): PsiElementVisitor =
+        UastHintedVisitorAdapter.create(holder.file.language, Visitor(holder), typesHint)
+
+    private class Visitor(private val holder: ProblemsHolder) : AbstractUastNonRecursiveVisitor() {
+
+        override fun visitLiteralExpression(node: ULiteralExpression): Boolean {
+            val result = LiteralTranslationIdentifier().identify(node)
+            if (result != null && result.required && result.text == null) {
                 holder.registerProblem(
-                    expression,
+                    node.sourcePsi!!,
                     "The given translation key does not exist",
-                    ProblemHighlightType.GENERIC_ERROR,
                     CreateTranslationQuickFix,
-                    ChangeTranslationQuickFix("Use existing translation")
+                    ChangeTranslationQuickFix("Use existing translation"),
                 )
             }
+
+            return true
         }
     }
 
@@ -50,19 +69,27 @@ class NoTranslationInspection : TranslationInspection() {
 
         override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
             try {
-                val literal = descriptor.psiElement as PsiLiteralExpression
+                val literal = descriptor.psiElement.toUElementOfType<ULiteralExpression>() ?: return
                 val translation = LiteralTranslationIdentifier().identify(literal)
                 val literalValue = literal.value as String
                 val key = translation?.key?.copy(infix = literalValue)?.full ?: literalValue
                 val result = Messages.showInputDialog(
+                    project,
                     "Enter default value for \"$key\":",
                     "Create Translation",
-                    Messages.getQuestionIcon()
+                    Messages.getQuestionIcon(),
                 )
                 if (result != null) {
-                    TranslationFiles.add(literal, key, result)
+                    TranslationFiles.add(literal.sourcePsi!!, key, result)
                 }
             } catch (ignored: IncorrectOperationException) {
+            } catch (e: Exception) {
+                Notification(
+                    "Translation support error",
+                    "Error while adding translation",
+                    e.message ?: e.stackTraceToString(),
+                    NotificationType.WARNING,
+                ).notify(project)
             }
         }
 

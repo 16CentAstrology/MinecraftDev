@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.action
@@ -56,7 +66,7 @@ import com.intellij.psi.PsiField
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiModifier
-import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.uiDesigner.core.GridConstraints
@@ -79,7 +89,7 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
     fun customInvoke(
         project: Project,
         editor: Editor,
-        file: PsiFile
+        file: PsiFile,
     ) {
         val aClass = OverrideImplementUtil.getContextClass(project, editor, file, false)
         if (aClass == null || aClass.isInterface) {
@@ -111,15 +121,15 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
                                 Project::class.java,
                                 Editor::class.java,
                                 PsiClass::class.java,
-                                Array<ClassMember>::class.java
+                                Array<ClassMember>::class.java,
                             ),
                             args = arrayOf(
                                 project,
                                 mixinEditor,
                                 mixinClass,
-                                members
+                                members,
                             ),
-                            owner = GenerateMembersHandlerBase::class.java
+                            owner = GenerateMembersHandlerBase::class.java,
                         )
                     } catch (e: GenerateCodeException) {
                         val message = e.message ?: "Unknown error"
@@ -130,12 +140,12 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
                                     HintManager.getInstance().showErrorHint(editor, message)
                                 }
                             },
-                            project.disposed
+                            project.disposed,
                         )
                     }
                 },
                 null,
-                null
+                null,
             )
         } finally {
             cleanup()
@@ -162,12 +172,12 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
         members.addAll(
             aClass.fields
                 .filter { canHaveAccessor(it) }
-                .map { PsiFieldMember(it) }
+                .map { PsiFieldMember(it) },
         )
         members.addAll(
             aClass.methods
                 .filter { canHaveInvoker(it) }
-                .map { PsiMethodMember(it) }
+                .map { PsiMethodMember(it) },
         )
         return members.toTypedArray()
     }
@@ -189,7 +199,7 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
                 }
                 val range = candidate.element.textRange
                 return@filter range != null && range.contains(offset)
-            }.toTypedArray()
+            }.toTypedArray(),
         )
 
         if (!chooser.showAndGet()) {
@@ -261,7 +271,7 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
             defaultPkg,
             CreateClassKind.CLASS,
             true,
-            defaultModule
+            defaultModule,
         )
         if (!dialog.showAndGet()) {
             return null
@@ -278,15 +288,15 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
                     JavaDirectoryService.getInstance().createInterface(pkg, name)
                 } catch (e: IncorrectOperationException) {
                     invokeLater {
-                        val message = MCDevBundle.message(
+                        val message = MCDevBundle(
                             "intention.error.cannot.create.class.message",
                             name,
-                            e.localizedMessage
+                            e.localizedMessage,
                         )
                         Messages.showErrorDialog(
                             project,
                             message,
-                            MCDevBundle.message("intention.error.cannot.create.class.title")
+                            MCDevBundle("intention.error.cannot.create.class.title"),
                         )
                     }
                     return@compute null
@@ -307,7 +317,7 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
                 val configToWrite = MixinModule.getBestWritableConfigForMixinClass(
                     project,
                     GlobalSearchScope.moduleScope(module),
-                    clazz.fullQualifiedName ?: ""
+                    clazz.fullQualifiedName ?: "",
                 )
                 configToWrite?.qualifiedMixins?.add(clazz.fullQualifiedName)
 
@@ -367,7 +377,7 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
                     originalMember.element,
                     aClass,
                     generateGetters,
-                    generateSetters
+                    generateSetters,
                 )
                 OverrideImplementUtil.convert2GenerationInfos(accessors).toTypedArray()
             }
@@ -375,7 +385,7 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
                 val invoker = generateInvoker(
                     aClass.project,
                     originalMember.element,
-                    aClass
+                    aClass,
                 ) ?: return GenerationInfo.EMPTY_ARRAY
                 arrayOf(OverrideImplementUtil.createGenerationInfo(invoker))
             }
@@ -388,7 +398,7 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
         target: PsiField,
         mixin: PsiClass,
         generateGetter: Boolean,
-        generateSetter: Boolean
+        generateSetter: Boolean,
     ): List<PsiMethod> {
         val factory = JavaPsiFacade.getElementFactory(project)
 
@@ -397,13 +407,13 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
         val accessors = arrayListOf<PsiMethod>()
 
         if (generateGetter) {
-            val prefix = if (target.type == PsiType.BOOLEAN) "is" else "get"
+            val prefix = if (target.type == PsiTypes.booleanType()) "is" else "get"
             val method = factory.createMethodFromText(
                 """
                 @${MixinConstants.Annotations.ACCESSOR}
                 ${staticPrefix(isStatic)}ReturnType $prefix${target.name.capitalize()}()${methodBody(isStatic)}
                 """.trimIndent(),
-                mixin
+                mixin,
             )
             target.typeElement?.let { method.returnTypeElement?.replace(it) }
             accessors.add(method)
@@ -413,7 +423,7 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
                 "@${MixinConstants.Annotations.ACCESSOR}\n" +
                     staticPrefix(isStatic) + "void set${target.name.capitalize()}" +
                     "(ParamType ${target.name})" + methodBody(isStatic),
-                mixin
+                mixin,
             )
             target.typeElement?.let { method.parameterList.parameters[0].typeElement?.replace(it) }
             if (target.modifierList?.hasExplicitModifier(PsiModifier.FINAL) == true) {
@@ -445,7 +455,7 @@ class GenerateAccessorHandler : GenerateMembersHandlerBase("Generate Accessor/In
             @${MixinConstants.Annotations.INVOKER}$invokerParams
             ${staticPrefix(isStatic)}ReturnType $name()${methodBody(isStatic)}
             """.trimIndent(),
-            mixin
+            mixin,
         )
         if (target.isConstructor) {
             val targetClass = target.containingClass ?: return null

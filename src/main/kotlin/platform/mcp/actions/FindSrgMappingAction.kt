@@ -1,16 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.actions
 
-import com.demonwav.mcdev.platform.mcp.srg.McpSrgMap
+import com.demonwav.mcdev.platform.mcp.mappings.Mappings
 import com.demonwav.mcdev.util.ActionData
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.psi.PsiClass
@@ -20,19 +30,19 @@ import com.intellij.psi.PsiMethod
 
 class FindSrgMappingAction : SrgActionBase() {
 
-    override fun withSrgTarget(parent: PsiElement, srgMap: McpSrgMap, e: AnActionEvent, data: ActionData) {
+    override fun withSrgTarget(parent: PsiElement, srgMap: Mappings, e: AnActionEvent, data: ActionData) {
         when (parent) {
             is PsiField -> {
-                val srg = srgMap.getSrgField(parent) ?: return showBalloon("No SRG name found", e)
+                val srg = srgMap.getIntermediaryField(parent) ?: return showBalloon("No SRG name found", e)
                 showSuccessBalloon(data.editor, data.element, "SRG name: " + srg.name)
             }
             is PsiMethod -> {
-                val srg = srgMap.getSrgMethod(parent) ?: return showBalloon("No SRG name found", e)
+                val srg = srgMap.getIntermediaryMethod(parent) ?: return showBalloon("No SRG name found", e)
                 showSuccessBalloon(data.editor, data.element, "SRG name: " + srg.name + srg.descriptor)
             }
             is PsiClass -> {
-                val classMcpToSrg = srgMap.getSrgClass(parent) ?: return showBalloon("No SRG name found", e)
-                showSuccessBalloon(data.editor, data.element, "SRG name: " + classMcpToSrg)
+                val classMcpToSrg = srgMap.getIntermediaryClass(parent) ?: return showBalloon("No SRG name found", e)
+                showSuccessBalloon(data.editor, data.element, "SRG name: $classMcpToSrg")
             }
             else -> showBalloon("Not a valid element", e)
         }

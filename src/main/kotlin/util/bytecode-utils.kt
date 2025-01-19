@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util
@@ -17,10 +27,13 @@ import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
+import com.intellij.psi.PsiModifier
 import com.intellij.psi.PsiPrimitiveType
 import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.TypeConversionUtil
+import org.jetbrains.plugins.groovy.lang.resolve.processors.inference.type
 
 private const val INTERNAL_CONSTRUCTOR_NAME = "<init>"
 
@@ -28,35 +41,37 @@ private const val INTERNAL_CONSTRUCTOR_NAME = "<init>"
 
 val PsiPrimitiveType.internalName: Char
     get() = when (this) {
-        PsiType.BYTE -> 'B'
-        PsiType.CHAR -> 'C'
-        PsiType.DOUBLE -> 'D'
-        PsiType.FLOAT -> 'F'
-        PsiType.INT -> 'I'
-        PsiType.LONG -> 'J'
-        PsiType.SHORT -> 'S'
-        PsiType.BOOLEAN -> 'Z'
-        PsiType.VOID -> 'V'
+        PsiTypes.byteType() -> 'B'
+        PsiTypes.charType() -> 'C'
+        PsiTypes.doubleType() -> 'D'
+        PsiTypes.floatType() -> 'F'
+        PsiTypes.intType() -> 'I'
+        PsiTypes.longType() -> 'J'
+        PsiTypes.shortType() -> 'S'
+        PsiTypes.booleanType() -> 'Z'
+        PsiTypes.voidType() -> 'V'
         else -> throw IllegalArgumentException("Unsupported primitive type: $this")
     }
 
 fun getPrimitiveType(internalName: Char): PsiPrimitiveType? {
     return when (internalName) {
-        'B' -> PsiType.BYTE
-        'C' -> PsiType.CHAR
-        'D' -> PsiType.DOUBLE
-        'F' -> PsiType.FLOAT
-        'I' -> PsiType.INT
-        'J' -> PsiType.LONG
-        'S' -> PsiType.SHORT
-        'Z' -> PsiType.BOOLEAN
-        'V' -> PsiType.VOID
+        'B' -> PsiTypes.byteType()
+        'C' -> PsiTypes.charType()
+        'D' -> PsiTypes.doubleType()
+        'F' -> PsiTypes.floatType()
+        'I' -> PsiTypes.intType()
+        'J' -> PsiTypes.longType()
+        'S' -> PsiTypes.shortType()
+        'Z' -> PsiTypes.booleanType()
+        'V' -> PsiTypes.voidType()
         else -> null
     }
 }
 
 val PsiType.descriptor
-    get() = appendDescriptor(StringBuilder()).toString()
+    get() = erasure().appendDescriptor(StringBuilder()).toString()
+
+private fun PsiType.erasure() = TypeConversionUtil.erasure(this)!!
 
 fun getPrimitiveWrapperClass(internalName: Char, project: Project): PsiClass? {
     val type = getPrimitiveType(internalName) ?: return null
@@ -149,11 +164,18 @@ val PsiMethod.descriptor: String?
 @Throws(ClassNameResolutionFailedException::class)
 private fun PsiMethod.appendDescriptor(builder: StringBuilder): StringBuilder {
     builder.append('(')
+    if (isConstructor) {
+        containingClass?.let { containingClass ->
+            if (containingClass.hasModifierProperty(PsiModifier.STATIC)) return@let
+            val outerClass = containingClass.containingClass
+            outerClass?.type()?.appendDescriptor(builder)
+        }
+    }
     for (parameter in parameterList.parameters) {
         parameter.type.appendDescriptor(builder)
     }
     builder.append(')')
-    return (returnType ?: PsiType.VOID).appendDescriptor(builder)
+    return (returnType ?: PsiTypes.voidType()).appendDescriptor(builder)
 }
 
 // Field

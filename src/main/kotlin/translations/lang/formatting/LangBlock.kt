@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.lang.formatting
@@ -40,7 +50,7 @@ class LangBlock(node: ASTNode, wrap: Wrap?, alignment: Alignment?, private val s
                     child,
                     Wrap.createWrap(WrapType.NONE, false),
                     Alignment.createAlignment(),
-                    spacingBuilder
+                    spacingBuilder,
                 )
                 blocks.add(block)
             }
@@ -50,7 +60,7 @@ class LangBlock(node: ASTNode, wrap: Wrap?, alignment: Alignment?, private val s
         return blocks
     }
 
-    override fun getIndent() = Indent.getNoneIndent()
+    override fun getIndent(): Indent = Indent.getNoneIndent()
 
     override fun getSpacing(child1: Block?, child2: Block) = spacingBuilder.getSpacing(this, child1, child2)
 

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.forge.util
@@ -41,5 +51,6 @@ object ForgeConstants {
     // From https://github.com/MinecraftForge/MinecraftForge/blob/38a5400a8c878fe39cd389e6d4f68619d2738b88/src/fmllauncher/java/net/minecraftforge/fml/loading/moddiscovery/ModInfo.java#L45
     val MOD_ID_REGEX = "^[a-z][a-z0-9_-]{1,63}$".toRegex()
 
-    val DISPLAY_TEST_MANIFEST_VERSION = SemanticVersion.release(41, 0, 15)
+    val DISPLAY_TEST_MANIFEST_VERSION = SemanticVersion.release(40, 2, 14)
+    val CLIENT_ONLY_MANIFEST_VERSION = SemanticVersion.release(49, 0, 6)
 }

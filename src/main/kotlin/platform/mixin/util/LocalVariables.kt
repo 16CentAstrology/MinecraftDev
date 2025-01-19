@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 /*
@@ -55,8 +65,10 @@ import com.intellij.psi.PsiForeachStatement
 import com.intellij.psi.PsiLambdaExpression
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiModifier
+import com.intellij.psi.PsiParameter
 import com.intellij.psi.PsiStatement
 import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 import com.intellij.psi.PsiVariable
 import com.intellij.psi.controlFlow.ControlFlow
 import com.intellij.psi.controlFlow.ControlFlowFactory
@@ -107,7 +119,13 @@ object LocalVariables {
 
         for (parameter in method.parameterList.parameters) {
             val mixinName = if (argsOnly) "var$argsIndex" else parameter.name
-            args += SourceLocalVariable(parameter.name, parameter.type, argsIndex, mixinName = mixinName)
+            args += SourceLocalVariable(
+                parameter.name,
+                parameter.type,
+                argsIndex,
+                mixinName = mixinName,
+                variable = parameter
+            )
             argsIndex++
             if (parameter.isDoubleSlot) {
                 argsIndex++
@@ -122,7 +140,7 @@ object LocalVariables {
         val controlFlow = ControlFlowFactory.getControlFlow(
             body,
             LocalsControlFlowPolicy(body),
-            ControlFlowOptions.NO_CONST_EVALUATE
+            ControlFlowOptions.NO_CONST_EVALUATE,
         )
 
         val allLocalVariables = guessAllLocalVariables(argsIndex, body, controlFlow)
@@ -133,7 +151,7 @@ object LocalVariables {
     private fun guessAllLocalVariables(
         argsSize: Int,
         body: PsiElement,
-        controlFlow: ControlFlow
+        controlFlow: ControlFlow,
     ): Array<List<SourceLocalVariable>> {
         return body.cached(PsiModificationTracker.MODIFICATION_COUNT) {
             guessAllLocalVariablesUncached(argsSize, body, controlFlow)
@@ -143,7 +161,7 @@ object LocalVariables {
     private fun guessAllLocalVariablesUncached(
         argsSize: Int,
         body: PsiElement,
-        controlFlow: ControlFlow
+        controlFlow: ControlFlow,
     ): Array<List<SourceLocalVariable>> {
         val method = body.parent
         val allLocalVariables = getAllLocalVariables(body)
@@ -156,7 +174,7 @@ object LocalVariables {
                     true
                 },
                 variable,
-                method
+                method,
             )
             // add on other implicit declarations in scope
             for (parent in generateSequence(variable.parent, PsiElement::getParent).takeWhile { it != method }) {
@@ -185,7 +203,7 @@ object LocalVariables {
             override fun visitWriteVariableInstruction(
                 instruction: WriteVariableInstruction,
                 offset: Int,
-                nextOffset: Int
+                nextOffset: Int,
             ) {
                 if (instruction.variable in allLocalVariables) {
                     val localIndex = instruction.variable.getUserData(LOCAL_INDEX_KEY)!!
@@ -195,7 +213,12 @@ object LocalVariables {
                         localsHere = localsHere.copyOf(localIndex + 1)
                     }
                     val name = instruction.variable.name ?: return
-                    localsHere[localIndex] = SourceLocalVariable(name, instruction.variable.type, localIndex)
+                    localsHere[localIndex] = SourceLocalVariable(
+                        name,
+                        instruction.variable.type,
+                        localIndex,
+                        variable = instruction.variable
+                    )
                     if (instruction.variable.isDoubleSlot && localIndex + 1 < localsHere.size) {
                         localsHere[localIndex + 1] = null
                     }
@@ -211,7 +234,7 @@ object LocalVariables {
                         val localsHere = this.locals[offset]
                             ?: arrayOfNulls<SourceLocalVariable>(variable.index + 1).also { this.locals[offset] = it }
                         localsHere[variable.index] = variable
-                        if (variable.type == PsiType.LONG || variable.type == PsiType.DOUBLE) {
+                        if (variable.type == PsiTypes.longType() || variable.type == PsiTypes.doubleType()) {
                             if (variable.index + 1 < localsHere.size) {
                                 localsHere[variable.index + 1] = null
                             }
@@ -227,6 +250,7 @@ object LocalVariables {
                 val localsHere = this.locals[offset] ?: emptyArray()
                 var changed = false
                 val nextLocals = this.locals[nextOffset]
+                @Suppress("KotlinConstantConditions") // kotlin is wrong
                 if (nextLocals == null) {
                     this.locals[nextOffset] = localsHere.clone()
                     changed = true
@@ -246,6 +270,7 @@ object LocalVariables {
                         }
                     }
                 }
+                @Suppress("KotlinConstantConditions") // kotlin is wrong
                 if (changed) {
                     instructionQueue.add(nextOffset)
                 }
@@ -278,18 +303,18 @@ object LocalVariables {
                     super.visitForeachStatement(statement)
                 }
 
-                override fun visitClass(aClass: PsiClass?) {
+                override fun visitClass(aClass: PsiClass) {
                     // don't recurse into classes
                 }
 
-                override fun visitMethod(method: PsiMethod?) {
+                override fun visitMethod(method: PsiMethod) {
                     // don't recurse into methods
                 }
 
-                override fun visitLambdaExpression(expression: PsiLambdaExpression?) {
+                override fun visitLambdaExpression(expression: PsiLambdaExpression) {
                     // don't recurse into lambdas
                 }
-            }
+            },
         )
         return locals
     }
@@ -299,13 +324,16 @@ object LocalVariables {
             // longs and doubles take two slots
             is PsiVariable -> if (element.isDoubleSlot) 2 else 1
             // arrays have copy of array, length and index variables, iterables have the iterator variable
-            is PsiForeachStatement -> if (element.iterationParameter.type is PsiArrayType) 3 else 1
+            is PsiForeachStatement -> {
+                val param = element.iterationParameter as? PsiParameter
+                if (param?.type is PsiArrayType) 3 else 1
+            }
             else -> 0
         }
     }
 
     private val PsiVariable.isDoubleSlot: Boolean
-        get() = type == PsiType.DOUBLE || type == PsiType.LONG
+        get() = type == PsiTypes.doubleType() || type == PsiTypes.longType()
 
     private fun PsiForeachStatement.getExtraLocals(): List<SourceLocalVariable> {
         val localIndex = getUserData(LOCAL_INDEX_KEY)!!
@@ -319,31 +347,31 @@ object LocalVariables {
                     type,
                     localIndex,
                     implicitLoadCountBefore = 1,
-                    implicitStoreCountBefore = 1
+                    implicitStoreCountBefore = 1,
                 ),
                 // length
                 SourceLocalVariable(
                     "var${localIndex + 1}",
-                    PsiType.INT,
+                    PsiTypes.intType(),
                     localIndex + 1,
                     implicitStoreCountBefore = 1,
-                    implicitLoadCountAfter = 1
+                    implicitLoadCountAfter = 1,
                 ),
                 // index
                 SourceLocalVariable(
                     "var${localIndex + 2}",
-                    PsiType.INT,
+                    PsiTypes.intType(),
                     localIndex + 2,
                     implicitStoreCountBefore = 1,
                     implicitLoadCountBefore = 1,
-                    implicitLoadCountAfter = 1
-                )
+                    implicitLoadCountAfter = 1,
+                ),
             )
         } else {
             val iteratorType = JavaPsiFacade.getElementFactory(project)
                 .createTypeByFQClassName(
                     CommonClassNames.JAVA_UTIL_ITERATOR,
-                    resolveScope
+                    resolveScope,
                 )
             return listOf(
                 // iterator
@@ -352,8 +380,8 @@ object LocalVariables {
                     iteratorType,
                     localIndex,
                     implicitStoreCountBefore = 1,
-                    implicitLoadCountBefore = 1
-                )
+                    implicitLoadCountBefore = 1,
+                ),
             )
         }
     }
@@ -362,7 +390,7 @@ object LocalVariables {
         module: Module,
         classNode: ClassNode,
         method: MethodNode,
-        node: AbstractInsnNode
+        node: AbstractInsnNode,
     ): Array<LocalVariable?>? {
         return getLocals(module.project, classNode, method, node, detectCurrentSettings(module))
     }
@@ -372,7 +400,7 @@ object LocalVariables {
         classNode: ClassNode,
         method: MethodNode,
         nodeArg: AbstractInsnNode,
-        settings: Settings
+        settings: Settings,
     ): Array<LocalVariable?>? {
         return try {
             doGetLocals(project, classNode, method, nodeArg, settings)
@@ -397,7 +425,7 @@ object LocalVariables {
         classNode: ClassNode,
         method: MethodNode,
         nodeArg: AbstractInsnNode,
-        settings: Settings
+        settings: Settings,
     ): Array<LocalVariable?> {
         var node = nodeArg
         for (i in 0 until 3) {
@@ -479,7 +507,7 @@ object LocalVariables {
                                 frameSize,
                                 frameData.type,
                                 frameData.computeFrameSize(initialFrameSize),
-                                initialFrameSize
+                                initialFrameSize,
                             )
                         }
                     } else {
@@ -488,7 +516,7 @@ object LocalVariables {
                                 frameSize,
                                 insn.type,
                                 frameNodeSize,
-                                initialFrameSize
+                                initialFrameSize,
                             )
                     }
 
@@ -498,7 +526,7 @@ object LocalVariables {
                             "Locals entered an invalid state evaluating " +
                                 "${classNode.name}::${method.name}${method.desc} at instruction " +
                                 "${method.instructions.indexOf(insn)}. Initial frame size is" +
-                                " $initialFrameSize, calculated a frame size of $frameSize"
+                                " $initialFrameSize, calculated a frame size of $frameSize",
                         )
                     }
                     if ((
@@ -528,7 +556,7 @@ object LocalVariables {
                                     classNode,
                                     method,
                                     method.instructions.indexOf(insn),
-                                    framePos
+                                    framePos,
                                 )
                         } else if (localType is Int) { // Integer refers to a primitive type or other marker
                             val isMarkerType = localType == Opcodes.UNINITIALIZED_THIS || localType == Opcodes.NULL
@@ -552,7 +580,7 @@ object LocalVariables {
                                         classNode,
                                         method,
                                         method.instructions.indexOf(insn),
-                                        framePos
+                                        framePos,
                                     )
                                 if (is64bitValue) {
                                     framePos++
@@ -561,7 +589,7 @@ object LocalVariables {
                             } else {
                                 throw IllegalStateException(
                                     "Unrecognised locals opcode $localType in locals array at position" +
-                                        " $localPos in ${classNode.name}.${method.name}${method.desc}"
+                                        " $localPos in ${classNode.name}.${method.name}${method.desc}",
                                 )
                             }
                         } else if (localType == null) {
@@ -572,7 +600,7 @@ object LocalVariables {
                                         classNode,
                                         method,
                                         insn,
-                                        framePos
+                                        framePos,
                                     )
                                 } else {
                                     frame[framePos] = ZombieLocalVariable.of(frame[framePos], ZombieLocalVariable.TRIM)
@@ -583,7 +611,7 @@ object LocalVariables {
                         } else {
                             throw IllegalStateException(
                                 "Invalid value $localType in locals array at position" +
-                                    " $localPos in ${classNode.name}.${method.name}${method.desc}"
+                                    " $localPos in ${classNode.name}.${method.name}${method.desc}",
                             )
                         }
                         framePos++
@@ -669,7 +697,7 @@ object LocalVariables {
         classNode: ClassNode,
         method: MethodNode,
         pos: AbstractInsnNode,
-        index: Int
+        index: Int,
     ): LocalVariable? {
         return getLocalVariableAt(project, classNode, method, method.instructions.indexOf(pos), index)
     }
@@ -679,7 +707,7 @@ object LocalVariables {
         classNode: ClassNode,
         method: MethodNode,
         pos: Int,
-        index: Int
+        index: Int,
     ): LocalVariable? {
         var localVariableNode: LocalVariable? = null
         var fallbackNode: LocalVariable? = null
@@ -722,7 +750,7 @@ object LocalVariables {
                 it.signature,
                 instructions.indexOf(it.start),
                 instructions.indexOf(it.end),
-                it.index
+                it.index,
             )
         }
     }
@@ -730,7 +758,7 @@ object LocalVariables {
     private fun getGeneratedLocalVariableTable(
         project: Project,
         classNode: ClassNode,
-        method: MethodNode
+        method: MethodNode,
     ): List<LocalVariable> {
         val frames = AsmDfaUtil.analyzeMethod(project, classNode, method) ?: throw LocalAnalysisFailedException()
 
@@ -808,7 +836,7 @@ object LocalVariables {
         val trimmedFrameThreshold: Int,
         val resurrectExposedOnLoad: Boolean,
         val resurrectExposedOnStore: Boolean,
-        val resurrectForBogusTop: Boolean
+        val resurrectForBogusTop: Boolean,
     ) {
         companion object {
             val NO_RESURRECT = Settings(
@@ -818,7 +846,7 @@ object LocalVariables {
                 trimmedFrameThreshold = 0,
                 resurrectExposedOnLoad = false,
                 resurrectExposedOnStore = false,
-                resurrectForBogusTop = false
+                resurrectForBogusTop = false,
             )
 
             val DEFAULT = Settings(
@@ -828,20 +856,25 @@ object LocalVariables {
                 trimmedFrameThreshold = -1,
                 resurrectExposedOnLoad = true,
                 resurrectExposedOnStore = true,
-                resurrectForBogusTop = true
+                resurrectForBogusTop = true,
             )
         }
     }
 
+    /**
+     * Represents a local variable in source code and its probable relationship to the bytecode. Don't store instances
+     * of this class.
+     */
     data class SourceLocalVariable(
         val name: String,
         val type: PsiType,
         val index: Int,
         val mixinName: String = name,
+        val variable: PsiVariable? = null,
         val implicitLoadCountBefore: Int = 0,
         val implicitLoadCountAfter: Int = 0,
         val implicitStoreCountBefore: Int = 0,
-        val implicitStoreCountAfter: Int = 0
+        val implicitStoreCountAfter: Int = 0,
     )
 
     open class LocalVariable(
@@ -850,7 +883,7 @@ object LocalVariables {
         val signature: String?,
         val start: Int?,
         var end: Int?,
-        val index: Int
+        val index: Int,
     ) {
         fun isInRange(index: Int): Boolean {
             val end = this.end
@@ -866,14 +899,14 @@ object LocalVariables {
 
     private class ZombieLocalVariable private constructor(
         val ancestor: LocalVariable,
-        val type: Char
+        val type: Char,
     ) : LocalVariable(
         ancestor.name,
         ancestor.desc,
         ancestor.signature,
         ancestor.start,
         ancestor.end,
-        ancestor.index
+        ancestor.index,
     ) {
         var lifetime = 0
         var frames = 0

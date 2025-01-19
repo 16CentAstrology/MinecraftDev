@@ -35,8 +35,8 @@ body:
         - Sponge
         - Architectury
         - Minecraft Forge
+        - NeoForge
         - Fabric
-        - Lite Loader
         - Velocity
         - Mixins
         - BungeeCord

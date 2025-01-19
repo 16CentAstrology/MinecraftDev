@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.framework
@@ -21,17 +31,20 @@ import java.util.jar.Attributes.Name.IMPLEMENTATION_VERSION
 
 class MixinPresentationProvider : LibraryPresentationProvider<LibraryVersionProperties>(MIXIN_LIBRARY_KIND) {
 
+    private val hintFilePath = "META-INF/services/org.spongepowered.asm.service.IMixinService"
+
     override fun getIcon(properties: LibraryVersionProperties?) = PlatformAssets.MIXIN_ICON
 
     override fun detect(classesRoots: List<VirtualFile>): LibraryVersionProperties? {
         for (classesRoot in classesRoots) {
-            val manifest = classesRoot.manifest ?: continue
-            if (manifest["Agent-Class"] != MixinConstants.Classes.MIXIN_AGENT) {
+            val manifest = classesRoot.manifest
+            if (manifest?.get("Agent-Class") != MixinConstants.Classes.MIXIN_AGENT &&
+                classesRoot.findFileByRelativePath(hintFilePath) == null
+            ) {
                 continue
             }
 
-            val version = manifest[IMPLEMENTATION_VERSION] ?: continue
-            return LibraryVersionProperties(version)
+            return LibraryVersionProperties(manifest?.get(IMPLEMENTATION_VERSION))
         }
         return null
     }

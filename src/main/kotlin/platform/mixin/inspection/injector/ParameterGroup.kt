@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.inspection.injector
@@ -17,12 +27,13 @@ import com.demonwav.mcdev.util.normalize
 import com.intellij.psi.PsiParameter
 import com.intellij.psi.PsiPrimitiveType
 import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 
 data class ParameterGroup(
     val parameters: List<Parameter>,
     val required: RequiredLevel = RequiredLevel.ERROR_IF_ABSENT,
     val default: Boolean = required != RequiredLevel.OPTIONAL,
-    val isVarargs: Boolean = false
+    val isVarargs: Boolean = false,
 ) {
 
     val size
@@ -55,7 +66,13 @@ data class ParameterGroup(
     }
 
     companion object {
-        private val INT_TYPES = setOf(PsiType.INT, PsiType.SHORT, PsiType.CHAR, PsiType.BYTE, PsiType.BOOLEAN)
+        private val INT_TYPES = setOf(
+            PsiTypes.intType(),
+            PsiTypes.shortType(),
+            PsiTypes.charType(),
+            PsiTypes.byteType(),
+            PsiTypes.booleanType()
+        )
 
         private fun matchParameter(expectedType: PsiType, parameter: PsiParameter, allowCoerce: Boolean): Boolean {
             val normalizedExpected = expectedType.normalize()

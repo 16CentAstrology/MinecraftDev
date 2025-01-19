@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.reference
@@ -33,7 +43,6 @@ import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiArrayInitializerMemberValue
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiLiteral
 import com.intellij.psi.PsiSubstitutor
 import com.intellij.psi.ResolveResult
 import com.intellij.psi.util.parentOfType
@@ -73,7 +82,9 @@ abstract class AbstractMethodReference : PolyReferenceResolver(), MixinReference
         val stringValue = context.constantStringValue ?: return false
         val targetMethodInfo = parseSelector(stringValue, context) ?: return false
         val targets = getTargets(context) ?: return false
-        return !targets.asSequence().flatMap { it.findMethods(targetMethodInfo) }.any()
+        return !targets.asSequence().flatMap {
+            targetMethodInfo.getCustomOwner(it).findMethods(targetMethodInfo)
+        }.any()
     }
 
     fun getReferenceIfAmbiguous(context: PsiElement): MemberReference? {
@@ -99,9 +110,8 @@ abstract class AbstractMethodReference : PolyReferenceResolver(), MixinReference
     private fun resolve(context: PsiElement): Sequence<ClassAndMethodNode>? {
         val targets = getTargets(context) ?: return null
         val targetedMethods = when (context) {
-            is PsiLiteral -> context.constantStringValue?.let { listOf(it) } ?: emptyList()
             is PsiArrayInitializerMemberValue -> context.initializers.mapNotNull { it.constantStringValue }
-            else -> emptyList()
+            else -> context.constantStringValue?.let { listOf(it) } ?: emptyList()
         }
 
         return targetedMethods.asSequence().flatMap { method ->
@@ -112,10 +122,13 @@ abstract class AbstractMethodReference : PolyReferenceResolver(), MixinReference
 
     private fun resolve(
         targets: Collection<ClassNode>,
-        selector: MixinSelector
+        selector: MixinSelector,
     ): Sequence<ClassAndMethodNode> {
         return targets.asSequence()
-            .flatMap { target -> target.findMethods(selector).map { ClassAndMethodNode(target, it) } }
+            .flatMap { target ->
+                val actualTarget = selector.getCustomOwner(target)
+                actualTarget.findMethods(selector).map { ClassAndMethodNode(actualTarget, it) }
+            }
     }
 
     fun resolveIfUnique(context: PsiElement): ClassAndMethodNode? {
@@ -126,16 +139,15 @@ abstract class AbstractMethodReference : PolyReferenceResolver(), MixinReference
         val targets = getTargets(context) ?: return null
 
         val targetedMethods = when (context) {
-            is PsiLiteral -> context.constantStringValue?.let { listOf(it) } ?: emptyList()
             is PsiArrayInitializerMemberValue -> context.initializers.mapNotNull { it.constantStringValue }
-            else -> emptyList()
+            else -> context.constantStringValue?.let { listOf(it) } ?: emptyList()
         }
 
         return targetedMethods.asSequence().flatMap { method ->
             val targetReference = parseSelector(method, context) ?: return@flatMap emptySequence()
             if (targetReference is MemberReference && targetReference.descriptor == null && isAmbiguous(
                     targets,
-                    targetReference
+                    targetReference,
                 )
             ) {
                 return@flatMap emptySequence()
@@ -150,7 +162,7 @@ abstract class AbstractMethodReference : PolyReferenceResolver(), MixinReference
                 it.clazz,
                 context.project,
                 scope = context.resolveScope,
-                canDecompile = true
+                canDecompile = true,
             )
         }?.toTypedArray()
     }
@@ -161,7 +173,7 @@ abstract class AbstractMethodReference : PolyReferenceResolver(), MixinReference
                 it.clazz,
                 context.project,
                 scope = context.resolveScope,
-                canDecompile = false
+                canDecompile = false,
             )
         }?.toResolveResults() ?: ResolveResult.EMPTY_ARRAY
     }
@@ -227,7 +239,7 @@ abstract class AbstractMethodReference : PolyReferenceResolver(), MixinReference
     private fun createLookup(
         context: PsiElement,
         methods: Sequence<ClassAndMethodNode>,
-        uniqueMethods: Set<String>
+        uniqueMethods: Set<String>,
     ): Array<Any> {
         return methods
             .map { m ->
@@ -241,13 +253,13 @@ abstract class AbstractMethodReference : PolyReferenceResolver(), MixinReference
                     m.clazz,
                     context.project,
                     scope = context.resolveScope,
-                    canDecompile = false
+                    canDecompile = false,
                 )
                 val builder = JavaLookupElementBuilder.forMethod(
                     sourceMethod,
                     targetMethodInfo.toMixinString(),
                     PsiSubstitutor.EMPTY,
-                    null
+                    null,
                 )
                     .withPresentableText(m.method.name)
                 addCompletionInfo(builder, context, targetMethodInfo)
@@ -259,7 +271,7 @@ abstract class AbstractMethodReference : PolyReferenceResolver(), MixinReference
     open fun addCompletionInfo(
         builder: LookupElementBuilder,
         context: PsiElement,
-        targetMethodInfo: MemberReference
+        targetMethodInfo: MemberReference,
     ): LookupElementBuilder {
         return builder.completeToLiteral(context)
     }

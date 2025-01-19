@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.handlers
@@ -24,6 +34,7 @@ import com.demonwav.mcdev.platform.mixin.util.getGenericParameterTypes
 import com.demonwav.mcdev.platform.mixin.util.hasAccess
 import com.demonwav.mcdev.platform.mixin.util.mixinTargets
 import com.demonwav.mcdev.util.Parameter
+import com.demonwav.mcdev.util.cached
 import com.demonwav.mcdev.util.computeStringArray
 import com.demonwav.mcdev.util.findAnnotations
 import com.demonwav.mcdev.util.findContainingClass
@@ -34,6 +45,9 @@ import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiEllipsisType
 import com.intellij.psi.PsiType
+import com.intellij.psi.util.PsiModificationTracker
+import com.llamalad7.mixinextras.expression.impl.point.ExpressionContext
+import java.util.concurrent.ConcurrentHashMap
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.AbstractInsnNode
 import org.objectweb.asm.tree.ClassNode
@@ -41,19 +55,25 @@ import org.objectweb.asm.tree.MethodNode
 
 abstract class InjectorAnnotationHandler : MixinAnnotationHandler {
     override fun resolveTarget(annotation: PsiAnnotation, targetClass: ClassNode): List<MixinTargetMember> {
-        val targetClassMethods = targetClass.methods ?: return emptyList()
-
         val methodAttr = annotation.findAttributeValue("method")
         val method = methodAttr?.computeStringArray() ?: emptyList()
         val desc = annotation.findAttributeValue("desc")?.findAnnotations() ?: emptyList()
         val selectors = method.mapNotNull { parseMixinSelector(it, methodAttr!!) } +
             desc.mapNotNull { DescSelectorParser.descSelectorFromAnnotation(it) }
 
-        return targetClassMethods.mapNotNull { targetMethod ->
-            if (selectors.any { it.matchMethod(targetMethod, targetClass) }) {
-                MethodTargetMember(targetClass, targetMethod)
-            } else {
-                null
+        val targetClassMethods = selectors.associateWith { selector ->
+            val actualTarget = selector.getCustomOwner(targetClass)
+            (actualTarget to actualTarget.methods)
+        }
+
+        return targetClassMethods.mapNotNull { (selector, pair) ->
+            val (clazz, methods) = pair
+            methods.firstNotNullOfOrNull { method ->
+                if (selector.matchMethod(method, clazz)) {
+                    MethodTargetMember(clazz, method)
+                } else {
+                    null
+                }
             }
         }
     }
@@ -71,37 +91,38 @@ abstract class InjectorAnnotationHandler : MixinAnnotationHandler {
         }.reduceOrNull(InsnResolutionInfo.Failure::combine) ?: InsnResolutionInfo.Failure()
     }
 
+    open fun getAtKey(annotation: PsiAnnotation): String = "at"
+
     protected open fun isUnresolved(
         annotation: PsiAnnotation,
         targetClass: ClassNode,
-        targetMethod: MethodNode
+        targetMethod: MethodNode,
     ): InsnResolutionInfo.Failure? {
-        return annotation.findAttributeValue("at")?.findAnnotations()
+        return annotation.findAttributeValue(getAtKey(annotation))?.findAnnotations()
             .ifNullOrEmpty { return InsnResolutionInfo.Failure() }!!
-            .mapNotNull { AtResolver(it, targetClass, targetMethod).isUnresolved() }
-            .firstOrNull()
+            .firstNotNullOfOrNull { AtResolver(it, targetClass, targetMethod).isUnresolved() }
     }
 
     override fun resolveForNavigation(annotation: PsiAnnotation, targetClass: ClassNode): List<PsiElement> {
         return resolveTarget(annotation, targetClass).flatMap { targetMember ->
             val targetMethod = targetMember as? MethodTargetMember ?: return@flatMap emptyList()
-            resolveForNavigation(annotation, targetClass, targetMethod.classAndMethod.method)
+            resolveForNavigation(annotation, targetMethod.classAndMethod.clazz, targetMethod.classAndMethod.method)
         }
     }
 
     protected open fun resolveForNavigation(
         annotation: PsiAnnotation,
         targetClass: ClassNode,
-        targetMethod: MethodNode
+        targetMethod: MethodNode,
     ): List<PsiElement> {
-        return annotation.findAttributeValue("at")?.findAnnotations()
+        return annotation.findAttributeValue(getAtKey(annotation))?.findAnnotations()
             .ifNullOrEmpty { return emptyList() }!!
             .flatMap { AtResolver(it, targetClass, targetMethod).resolveNavigationTargets() }
     }
 
-    fun resolveInstructions(annotation: PsiAnnotation): List<InsnResult> {
-        val containingClass = annotation.findContainingClass() ?: return emptyList()
-        return containingClass.mixinTargets.flatMap { resolveInstructions(annotation, it) }
+    fun resolveInstructions(annotation: PsiAnnotation) = annotation.cached(PsiModificationTracker.MODIFICATION_COUNT) {
+        val containingClass = annotation.findContainingClass() ?: return@cached emptyList()
+        containingClass.mixinTargets.flatMap { resolveInstructions(annotation, it) }
     }
 
     fun resolveInstructions(annotation: PsiAnnotation, targetClass: ClassNode): List<InsnResult> {
@@ -118,11 +139,16 @@ abstract class InjectorAnnotationHandler : MixinAnnotationHandler {
         annotation: PsiAnnotation,
         targetClass: ClassNode,
         targetMethod: MethodNode,
-        mode: CollectVisitor.Mode = CollectVisitor.Mode.MATCH_ALL
+        mode: CollectVisitor.Mode = CollectVisitor.Mode.MATCH_ALL,
     ): List<CollectVisitor.Result<*>> {
-        return annotation.findAttributeValue("at")?.findAnnotations()
-            .ifNullOrEmpty { return emptyList() }!!
-            .flatMap { AtResolver(it, targetClass, targetMethod).resolveInstructions(mode) }
+        val cache = annotation.cached(PsiModificationTracker.MODIFICATION_COUNT) {
+            ConcurrentHashMap<Pair<ClassAndMethodNode, CollectVisitor.Mode>, List<CollectVisitor.Result<*>>>()
+        }
+        return cache.computeIfAbsent(ClassAndMethodNode(targetClass, targetMethod) to mode) {
+            annotation.findAttributeValue(getAtKey(annotation))?.findAnnotations()
+                .ifNullOrEmpty { return@computeIfAbsent emptyList() }!!
+                .flatMap { AtResolver(it, targetClass, targetMethod).resolveInstructions(mode) }
+        }
     }
 
     /**
@@ -133,7 +159,7 @@ abstract class InjectorAnnotationHandler : MixinAnnotationHandler {
     abstract fun expectedMethodSignature(
         annotation: PsiAnnotation,
         targetClass: ClassNode,
-        targetMethod: MethodNode
+        targetMethod: MethodNode,
     ): List<MethodSignature>?
 
     open fun isInsnAllowed(insn: AbstractInsnNode): Boolean {
@@ -148,6 +174,8 @@ abstract class InjectorAnnotationHandler : MixinAnnotationHandler {
 
     override val isEntryPoint = true
 
+    abstract val mixinExtrasExpressionContextType: ExpressionContext.Type
+
     data class InsnResult(val method: ClassAndMethodNode, val result: CollectVisitor.Result<*>)
 
     companion object {
@@ -155,7 +183,7 @@ abstract class InjectorAnnotationHandler : MixinAnnotationHandler {
         protected fun collectTargetMethodParameters(
             project: Project,
             clazz: ClassNode,
-            targetMethod: MethodNode
+            targetMethod: MethodNode,
         ): List<Parameter> {
             val numLocalsToDrop = if (targetMethod.hasAccess(Opcodes.ACC_STATIC)) 0 else 1
             val localVariables = targetMethod.localVariables?.sortedBy { it.index }
@@ -188,8 +216,10 @@ object DefaultInjectorAnnotationHandler : InjectorAnnotationHandler() {
     override fun expectedMethodSignature(
         annotation: PsiAnnotation,
         targetClass: ClassNode,
-        targetMethod: MethodNode
+        targetMethod: MethodNode,
     ) = null
 
     override val isSoft = true
+
+    override val mixinExtrasExpressionContextType = ExpressionContext.Type.CUSTOM
 }

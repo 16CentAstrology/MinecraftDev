@@ -1,128 +1,62 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.creator
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.asset.PlatformAssets
-import com.demonwav.mcdev.platform.MinecraftModuleType
-import com.demonwav.mcdev.platform.architectury.creator.ArchitecturyProjectSettingsWizard
-import com.demonwav.mcdev.platform.bukkit.creator.BukkitProjectSettingsWizard
-import com.demonwav.mcdev.platform.bungeecord.creator.BungeeCordProjectSettingsWizard
-import com.demonwav.mcdev.platform.fabric.creator.FabricProjectSettingsWizard
-import com.demonwav.mcdev.platform.forge.creator.ForgeProjectSettingsWizard
-import com.demonwav.mcdev.platform.liteloader.creator.LiteLoaderProjectSettingsWizard
-import com.demonwav.mcdev.platform.sponge.creator.SpongeProjectSettingsWizard
-import com.demonwav.mcdev.platform.velocity.creator.VelocityProjectSettingsWizard
-import com.intellij.ide.util.projectWizard.JavaModuleBuilder
-import com.intellij.ide.util.projectWizard.ModuleWizardStep
+import com.demonwav.mcdev.creator.buildsystem.BuildSystemPropertiesStep
+import com.demonwav.mcdev.creator.platformtype.PlatformTypeStep
+import com.demonwav.mcdev.creator.step.NewProjectWizardChainStep.Companion.nextStep
+import com.intellij.ide.projectWizard.ProjectSettingsStep
 import com.intellij.ide.util.projectWizard.WizardContext
-import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.module.ModuleType
-import com.intellij.openapi.project.DumbAwareRunnable
-import com.intellij.openapi.project.DumbService
+import com.intellij.ide.wizard.AbstractNewProjectWizardBuilder
+import com.intellij.ide.wizard.GitNewProjectWizardStep
+import com.intellij.ide.wizard.NewProjectWizardBaseStep
+import com.intellij.ide.wizard.RootNewProjectWizardStep
 import com.intellij.openapi.roots.ModifiableRootModel
-import com.intellij.openapi.roots.ui.configuration.ModulesProvider
-import com.intellij.openapi.startup.StartupManager
-import com.intellij.openapi.util.io.FileUtil
-import com.intellij.openapi.util.registry.Registry
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VirtualFile
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 
-class MinecraftModuleBuilder : JavaModuleBuilder() {
+class MinecraftModuleBuilder : AbstractNewProjectWizardBuilder() {
 
-    private val creator = MinecraftProjectCreator()
-
-    override fun getPresentableName() = MinecraftModuleType.NAME
+    override fun getPresentableName() = "Minecraft (Old Wizard)"
     override fun getNodeIcon() = PlatformAssets.MINECRAFT_ICON
-    override fun getGroupName() = MinecraftModuleType.NAME
-    override fun getWeight() = BUILD_SYSTEM_WEIGHT - 1
+    override fun getGroupName() = "Minecraft"
     override fun getBuilderId() = "MINECRAFT_MODULE"
-
-    override fun isAvailable() = true // TODO: use the new project wizard system
+    override fun getDescription() = MCDevBundle("creator.ui.create_minecraft_project")
 
     override fun setupRootModel(modifiableRootModel: ModifiableRootModel) {
-        val project = modifiableRootModel.project
-        val (root, vFile) = createAndGetRoot()
-        modifiableRootModel.addContentEntry(vFile)
-
         if (moduleJdk != null) {
             modifiableRootModel.sdk = moduleJdk
         } else {
             modifiableRootModel.inheritSdk()
         }
-
-        val r = DumbAwareRunnable {
-            creator.create(root, modifiableRootModel.module)
-        }
-
-        if (project.isDisposed) {
-            return
-        }
-
-        if (
-            ApplicationManager.getApplication().isUnitTestMode ||
-            ApplicationManager.getApplication().isHeadlessEnvironment
-        ) {
-            r.run()
-            return
-        }
-
-        if (!project.isInitialized) {
-            StartupManager.getInstance(project).registerPostStartupActivity(r)
-            return
-        }
-
-        DumbService.getInstance(project).runWhenSmart(r)
     }
 
-    private fun createAndGetRoot(): Pair<Path, VirtualFile> {
-        val temp = contentEntryPath ?: throw IllegalStateException("Failed to get content entry path")
+    override fun getParentGroup() = "Minecraft"
 
-        val pathName = FileUtil.toSystemIndependentName(temp)
+    override fun createStep(context: WizardContext) = RootNewProjectWizardStep(context)
+        .nextStep(::NewProjectWizardBaseStep)
+        .nextStep(::GitNewProjectWizardStep)
+        .nextStep(PlatformTypeStep::create)
+        .nextStep(::BuildSystemPropertiesStep)
+        .nextStep(::ProjectSetupFinalizerWizardStep)
 
-        val path = Paths.get(pathName)
-        Files.createDirectories(path)
-        val vFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(pathName)
-            ?: throw IllegalStateException("Failed to refresh and file file: $path")
-
-        return path to vFile
-    }
-
-    override fun getModuleType(): ModuleType<*> = MinecraftModuleType.instance
-    override fun getParentGroup() = MinecraftModuleType.NAME
-
-    override fun createWizardSteps(
-        wizardContext: WizardContext,
-        modulesProvider: ModulesProvider
-    ): Array<ModuleWizardStep> {
-        val baseSteps = arrayOf(
-            BuildSystemWizardStep(creator),
-            BukkitProjectSettingsWizard(creator),
-            SpongeProjectSettingsWizard(creator),
-            ForgeProjectSettingsWizard(creator),
-            FabricProjectSettingsWizard(creator),
-            ArchitecturyProjectSettingsWizard(creator),
-            LiteLoaderProjectSettingsWizard(creator),
-            VelocityProjectSettingsWizard(creator),
-            BungeeCordProjectSettingsWizard(creator)
-        )
-        if (Registry.`is`("mcdev.wizard.finalizer")) {
-            return baseSteps + ProjectSetupFinalizerWizardStep(creator, wizardContext)
-        }
-        return baseSteps
-    }
-
-    override fun getCustomOptionsStep(context: WizardContext?, parentDisposable: Disposable?) =
-        PlatformChooserWizardStep(creator)
+    override fun getIgnoredSteps() = listOf(ProjectSettingsStep::class.java)
 }

@@ -1,35 +1,41 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.sponge
 
 import com.demonwav.mcdev.asset.PlatformAssets
 import com.demonwav.mcdev.facet.MinecraftFacet
-import com.demonwav.mcdev.insight.generation.GenerationData
+import com.demonwav.mcdev.insight.generation.EventListenerGenerationSupport
 import com.demonwav.mcdev.inspection.IsCancelled
 import com.demonwav.mcdev.platform.AbstractModule
 import com.demonwav.mcdev.platform.PlatformType
-import com.demonwav.mcdev.platform.sponge.generation.SpongeGenerationData
 import com.demonwav.mcdev.platform.sponge.util.SpongeConstants
 import com.demonwav.mcdev.util.extendsOrImplements
 import com.demonwav.mcdev.util.findContainingMethod
+import com.demonwav.mcdev.util.runCatchingKtIdeaExceptions
 import com.intellij.lang.jvm.JvmModifier
 import com.intellij.psi.JavaPsiFacade
-import com.intellij.psi.PsiAnnotationMemberValue
 import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiMethodCallExpression
-import com.intellij.psi.PsiType
-import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UIdentifier
 import org.jetbrains.uast.toUElementOfType
@@ -40,6 +46,8 @@ class SpongeModule(facet: MinecraftFacet) : AbstractModule(facet) {
     override val type = PlatformType.SPONGE
     override val icon = PlatformAssets.SPONGE_ICON
 
+    override val eventListenerGenSupport: EventListenerGenerationSupport = SpongeEventListenerGenerationSupport()
+
     override fun isEventClassValid(eventClass: PsiClass, method: PsiMethod?) =
         "org.spongepowered.api.event.Event" == eventClass.qualifiedName
 
@@ -47,58 +55,13 @@ class SpongeModule(facet: MinecraftFacet) : AbstractModule(facet) {
         "Parameter is not an instance of org.spongepowered.api.event.Event\n" +
             "Compiling and running this listener may result in a runtime exception"
 
-    override fun generateEventListenerMethod(
-        containingClass: PsiClass,
-        chosenClass: PsiClass,
-        chosenName: String,
-        data: GenerationData?
-    ): PsiMethod? {
-        val method = JavaPsiFacade.getElementFactory(project).createMethod(chosenName, PsiType.VOID)
-        val parameterList = method.parameterList
-
-        val qName = chosenClass.qualifiedName ?: return null
-        val parameter = JavaPsiFacade.getElementFactory(project)
-            .createParameter(
-                "event",
-                PsiClassType.getTypeByName(qName, project, GlobalSearchScope.allScope(project))
-            )
-
-        parameterList.add(parameter)
-        val modifierList = method.modifierList
-
-        val listenerAnnotation = modifierList.addAnnotation("org.spongepowered.api.event.Listener")
-
-        val generationData = (data as SpongeGenerationData?)!!
-
-        if (!generationData.isIgnoreCanceled) {
-            val annotation = modifierList.addAnnotation("org.spongepowered.api.event.filter.IsCancelled")
-            val value = JavaPsiFacade.getElementFactory(project)
-                .createExpressionFromText("org.spongepowered.api.util.Tristate.UNDEFINED", annotation)
-
-            annotation.setDeclaredAttributeValue<PsiAnnotationMemberValue>("value", value)
-        }
-
-        if (generationData.eventOrder != "DEFAULT") {
-            val value = JavaPsiFacade.getElementFactory(project)
-                .createExpressionFromText(
-                    "org.spongepowered.api.event.Order." + generationData.eventOrder,
-                    listenerAnnotation
-                )
-
-            listenerAnnotation.setDeclaredAttributeValue<PsiAnnotationMemberValue>("order", value)
-        }
-
-        return method
-    }
-
     override fun shouldShowPluginIcon(element: PsiElement?): Boolean {
         val identifier = element?.toUElementOfType<UIdentifier>()
             ?: return false
 
-        val psiClass = identifier.uastParent as? UClass
-            ?: return false
+        val psiClass = runCatchingKtIdeaExceptions { identifier.uastParent as? UClass ?: return false }
 
-        if (psiClass.hasModifier(JvmModifier.ABSTRACT)) {
+        if (psiClass == null || psiClass.javaPsi.hasModifier(JvmModifier.ABSTRACT)) {
             return false
         }
 
@@ -122,8 +85,7 @@ class SpongeModule(facet: MinecraftFacet) : AbstractModule(facet) {
                 return null
             }
 
-            val sub = text.substring(text.lastIndexOf('.') + 1)
-            when (sub) {
+            when (text.substring(text.lastIndexOf('.') + 1)) {
                 "TRUE" -> true
                 "FALSE" -> false
                 else -> return null
@@ -154,9 +116,9 @@ class SpongeModule(facet: MinecraftFacet) : AbstractModule(facet) {
             fix = {
                 expression.replace(
                     JavaPsiFacade.getElementFactory(project)
-                        .createExpressionFromText(if (isCancelled) "true" else "false", expression)
+                        .createExpressionFromText(if (isCancelled) "true" else "false", expression),
                 )
-            }
+            },
         )
     }
 }

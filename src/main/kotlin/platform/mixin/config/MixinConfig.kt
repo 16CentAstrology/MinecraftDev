@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.config
@@ -112,34 +122,33 @@ class MixinConfig(private val project: Project, private var json: JsonObject) {
         get() = FullyQualifiedMixinList(MixinList("server"))
 
     private fun deleteCommaAround(element: PsiElement) {
-        // Delete the comma before, if it exists
-        var elem = element.prevSibling
-        while (elem != null) {
-            if (elem.node.elementType === JsonElementTypes.COMMA || (elem is PsiErrorElement && elem.text == ",")) {
-                elem.delete()
-                return
-            } else if (elem is PsiComment || elem is PsiWhiteSpace) {
-                elem = elem.prevSibling
-            } else {
-                break
+        fun deleteComma(element: PsiElement?): Boolean {
+            var elem = element
+            while (elem != null) {
+                if (elem.node.elementType === JsonElementTypes.COMMA || (elem is PsiErrorElement && elem.text == ",")) {
+                    elem.delete()
+                    return true
+                } else if (elem is PsiComment || elem is PsiWhiteSpace) {
+                    elem = elem.prevSibling
+                } else {
+                    return false
+                }
             }
+            return false
+        }
+
+        // Delete the comma before, if it exists
+        if (deleteComma(element.prevSibling)) {
+            return
         }
 
         // If it didn't exist, delete the comma after if it exists
-        elem = element.nextSibling
-        while (elem != null) {
-            if (elem.node.elementType === JsonElementTypes.COMMA || (elem is PsiErrorElement && elem.text == ",")) {
-                elem.delete()
-                return
-            } else if (elem is PsiComment || elem is PsiWhiteSpace) {
-                elem = elem.nextSibling
-            } else {
-                break
-            }
-        }
+        deleteComma(element.nextSibling)
     }
 
     private fun reformat() {
+        if(json.containingFile.name.endsWith(".json5")) return
+
         json = CodeStyleManager.getInstance(project).reformat(json) as JsonObject
         file?.let { file ->
             val psiFile = PsiManager.getInstance(project).findFile(file) as? JsonFile ?: return

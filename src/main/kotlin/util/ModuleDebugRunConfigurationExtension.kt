@@ -1,15 +1,27 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util
 
+import com.demonwav.mcdev.facet.MinecraftFacet
+import com.demonwav.mcdev.platform.mcp.McpModuleType
 import com.intellij.execution.RunConfigurationExtension
 import com.intellij.execution.configurations.DebuggingRunnerData
 import com.intellij.execution.configurations.JavaParameters
@@ -19,18 +31,20 @@ import com.intellij.execution.configurations.RunnerSettings
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.options.SettingsEditor
+import com.intellij.openapi.project.modules
 import org.jdom.Element
+import org.jetbrains.plugins.gradle.service.execution.GradleRunConfiguration
 
 abstract class ModuleDebugRunConfigurationExtension : RunConfigurationExtension() {
 
     override fun isApplicableFor(configuration: RunConfigurationBase<*>): Boolean {
-        return configuration is ModuleBasedConfiguration<*, *>
+        return configuration is ModuleBasedConfiguration<*, *> || configuration is GradleRunConfiguration
     }
 
     override fun <T : RunConfigurationBase<*>> updateJavaParameters(
         configuration: T,
         params: JavaParameters,
-        runnerSettings: RunnerSettings?
+        runnerSettings: RunnerSettings?,
     ) {
     }
 
@@ -39,16 +53,28 @@ abstract class ModuleDebugRunConfigurationExtension : RunConfigurationExtension(
     override fun attachToProcess(
         configuration: RunConfigurationBase<*>,
         handler: ProcessHandler,
-        runnerSettings: RunnerSettings?
+        runnerSettings: RunnerSettings?,
     ) {
         // Check if we are in a debug run
         if (runnerSettings !is DebuggingRunnerData) {
             return
         }
 
-        val config = configuration as ModuleBasedConfiguration<*, *>
-        val module = config.configurationModule.module ?: return
-        attachToProcess(handler, module)
+        when (configuration) {
+            is ModuleBasedConfiguration<*, *> -> {
+                val module = configuration.configurationModule.module ?: return
+                attachToProcess(handler, module)
+            }
+            is GradleRunConfiguration -> {
+                // Loose way to confirm we are in an MCP project, this is fine for now because we don't rely on specific
+                // information to ungrab (like MC version)
+                // Ideally we would find the module matching the run's sourceSet as defined in the build script
+                val module = configuration.project.modules.firstOrNull {
+                    MinecraftFacet.getInstance(it)?.isOfType(McpModuleType) == true
+                } ?: return
+                attachToProcess(handler, module)
+            }
+        }
     }
 
     override fun readExternal(runConfiguration: RunConfigurationBase<*>, element: Element) {}

@@ -1,19 +1,32 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.fabricloom
 
+import com.demonwav.mcdev.platform.mcp.McpModuleSettings
+import com.demonwav.mcdev.platform.mcp.gradle.McpModelData
 import com.demonwav.mcdev.platform.mcp.gradle.tooling.fabricloom.FabricLoomModel
 import com.intellij.openapi.externalSystem.model.DataNode
 import com.intellij.openapi.externalSystem.model.project.ModuleData
 import org.gradle.tooling.model.idea.IdeaModule
+import org.jetbrains.plugins.gradle.model.data.GradleSourceSetData
 import org.jetbrains.plugins.gradle.service.project.AbstractProjectResolverExtension
 
 class FabricLoomProjectResolverExtension : AbstractProjectResolverExtension() {
@@ -32,8 +45,31 @@ class FabricLoomProjectResolverExtension : AbstractProjectResolverExtension() {
                 }
             }
 
-            val data = FabricLoomData(ideModule.data, loomData.tinyMappings, decompilers, loomData.splitMinecraftJar)
+            val data = FabricLoomData(
+                ideModule.data,
+                loomData.tinyMappings,
+                decompilers,
+                loomData.splitMinecraftJar,
+                loomData.modSourceSets
+            )
             ideModule.createChild(FabricLoomData.KEY, data)
+
+            val mcpData = McpModelData(
+                ideModule.data,
+                McpModuleSettings.State(
+                    minecraftVersion = loomData.minecraftVersion,
+                ),
+                null,
+                null
+            )
+            ideModule.createChild(McpModelData.KEY, mcpData)
+
+            for (child in ideModule.children) {
+                val childData = child.data
+                if (childData is GradleSourceSetData) {
+                    child.createChild(McpModelData.KEY, mcpData.copy(module = childData))
+                }
+            }
         }
 
         super.populateModuleExtraModels(gradleModule, ideModule)

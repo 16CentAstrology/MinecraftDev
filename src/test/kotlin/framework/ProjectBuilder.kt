@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.framework
@@ -33,26 +43,38 @@ class ProjectBuilder(private val fixture: JavaCodeInsightTestFixture, private va
         path: String,
         @Language("JAVA") code: String,
         configure: Boolean = true,
-        allowAst: Boolean = false
+        allowAst: Boolean = false,
     ) = file(path, code, ".java", configure, allowAst)
     fun at(
         path: String,
         @Language("Access Transformers") code: String,
         configure: Boolean = true,
-        allowAst: Boolean = false
+        allowAst: Boolean = false,
     ) = file(path, code, "_at.cfg", configure, allowAst)
     fun lang(
         path: String,
         @Language("MCLang") code: String,
         configure: Boolean = true,
-        allowAst: Boolean = false
+        allowAst: Boolean = false,
     ) = file(path, code, ".lang", configure, allowAst)
     fun nbtt(
         path: String,
         @Language("NBTT") code: String,
         configure: Boolean = true,
-        allowAst: Boolean = false
+        allowAst: Boolean = false,
     ) = file(path, code, ".nbtt", configure, allowAst)
+    fun json(
+        path: String,
+        @Language("JSON") code: String,
+        configure: Boolean = true,
+        allowAst: Boolean = false,
+    ) = file(path, code, ".json", configure, allowAst)
+    fun yml(
+        path: String,
+        @Language("yaml") code: String,
+        configure: Boolean = true,
+        allowAst: Boolean = false,
+    ) = file(path, code, ".yml", configure, allowAst)
 
     inline fun dir(path: String, block: ProjectBuilder.() -> Unit) {
         val oldIntermediatePath = intermediatePath

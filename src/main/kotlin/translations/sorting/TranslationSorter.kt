@@ -1,45 +1,62 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.sorting
 
 import com.demonwav.mcdev.translations.Translation
-import com.demonwav.mcdev.translations.TranslationConstants
 import com.demonwav.mcdev.translations.TranslationFiles
 import com.demonwav.mcdev.translations.actions.TranslationSortOrderDialog
 import com.demonwav.mcdev.translations.index.TranslationIndex
+import com.demonwav.mcdev.util.applyWriteAction
 import com.demonwav.mcdev.util.lexicographical
 import com.demonwav.mcdev.util.mcDomain
 import com.demonwav.mcdev.util.runWriteAction
 import com.intellij.openapi.project.Project
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
+import com.intellij.psi.codeStyle.CodeStyleManager
+import java.util.TreeSet
 
 object TranslationSorter {
     private val ascendingComparator = compareBy<Translation, Iterable<String>>(
-        naturalOrder<String>().lexicographical()
+        naturalOrder<String>().lexicographical(),
     ) { it.key.split('.') }
 
     private val descendingComparator = ascendingComparator.reversed()
 
-    fun query(project: Project, file: PsiFile, defaultSelection: Ordering = Ordering.ASCENDING) {
-        val domain = file.virtualFile.mcDomain
-        val defaultEntries = TranslationIndex.getProjectDefaultTranslations(project, domain)
-        val noDefaults = defaultEntries.none()
-        val isDefaultFile = TranslationFiles.getLocale(file.virtualFile) == TranslationConstants.DEFAULT_LOCALE
-        val (order, comments) = TranslationSortOrderDialog.show(noDefaults || isDefaultFile, defaultSelection)
+    fun query(
+        project: Project,
+        file: PsiFile,
+        hasDefaultTranslations: Boolean,
+        defaultSelection: Ordering = Ordering.ASCENDING
+    ) {
+        val (order, comments) = TranslationSortOrderDialog.show(
+            hasDefaultTranslations || TranslationFiles.isDefaultLocale(file.virtualFile),
+            defaultSelection
+        )
 
         if (order == null) {
             return
         }
 
-        sort(project, file, order, comments)
+        file.applyWriteAction { sort(project, file, order, comments) }
     }
 
     private fun sort(project: Project, file: PsiFile, ordering: Ordering, keepComments: Int) {
@@ -51,21 +68,21 @@ object TranslationSorter {
                 Ordering.ASCENDING -> TranslationFiles.buildFileEntries(
                     project,
                     locale,
-                    it.sortedWith(ascendingComparator),
-                    keepComments
+                    it.sortedWith(ascendingComparator).asIterable(),
+                    keepComments,
                 )
                 Ordering.DESCENDING -> TranslationFiles.buildFileEntries(
                     project,
                     locale,
-                    it.sortedWith(descendingComparator),
-                    keepComments
+                    it.sortedWith(descendingComparator).asIterable(),
+                    keepComments,
                 )
                 Ordering.TEMPLATE -> sortByTemplate(
                     project,
                     locale,
                     TemplateManager.getProjectTemplate(project),
                     it,
-                    keepComments
+                    keepComments,
                 )
                 else -> sortByTemplate(
                     project,
@@ -73,13 +90,19 @@ object TranslationSorter {
                     TranslationFiles.buildSortingTemplateFromDefault(file, domain)
                         ?: throw IllegalStateException("Could not generate template from default translation file"),
                     it,
-                    keepComments
+                    keepComments,
                 )
             }
         }
 
         file.runWriteAction {
             TranslationFiles.replaceAll(file, sorted.asIterable())
+            val documentManager = PsiDocumentManager.getInstance(project)
+            val document = documentManager.getDocument(file)
+            if (document != null) {
+                documentManager.commitDocument(document)
+                CodeStyleManager.getInstance(project).reformat(file, true)
+            }
         }
     }
 
@@ -88,7 +111,7 @@ object TranslationSorter {
         locale: String,
         template: Template,
         entries: Sequence<Translation>,
-        keepComments: Int
+        keepComments: Int,
     ) = sequence {
         val tmp = entries.toMutableList()
 
@@ -97,14 +120,14 @@ object TranslationSorter {
                 is Comment -> yield(TranslationFiles.FileEntry.Comment(elem.text))
                 EmptyLine -> yield(TranslationFiles.FileEntry.EmptyLine)
                 is Key -> {
-                    val toWrite = tmp.asSequence().filter { elem.matcher.matches(it.key) }
+                    val toWrite = tmp.filterTo(TreeSet(ascendingComparator)) { elem.matcher.matches(it.key) }
                     yieldAll(
                         TranslationFiles.buildFileEntries(
                             project,
                             locale,
-                            toWrite.sortedWith(ascendingComparator),
-                            keepComments
-                        )
+                            toWrite,
+                            keepComments,
+                        ),
                     )
                     tmp.removeAll(toWrite)
                 }
@@ -116,9 +139,9 @@ object TranslationSorter {
                 TranslationFiles.buildFileEntries(
                     project,
                     locale,
-                    tmp.sortedWith(ascendingComparator).asSequence(),
-                    keepComments
-                )
+                    tmp.sortedWith(ascendingComparator),
+                    keepComments,
+                ),
             )
         }
     }

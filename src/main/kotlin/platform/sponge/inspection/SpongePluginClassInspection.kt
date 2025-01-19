@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.sponge.inspection
@@ -19,6 +29,7 @@ import com.intellij.codeInsight.daemon.impl.quickfix.ModifierFix
 import com.intellij.codeInsight.intention.QuickFixFactory
 import com.intellij.codeInspection.AbstractBaseJavaLocalInspectionTool
 import com.intellij.codeInspection.InspectionManager
+import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
@@ -66,7 +77,7 @@ class SpongePluginClassInspection : AbstractBaseJavaLocalInspectionTool() {
                         injectAnno,
                         "There can only be one injected constructor.",
                         quickFixFactory.createDeleteFix(injectAnno, "Remove this @Inject"),
-                        quickFixFactory.createDeleteFix(injectedMethod, "Remove this injected constructor")
+                        quickFixFactory.createDeleteFix(injectedMethod, "Remove this injected constructor"),
                     )
                 }
             }
@@ -80,7 +91,7 @@ class SpongePluginClassInspection : AbstractBaseJavaLocalInspectionTool() {
                         classIdentifier,
                         "Plugin class must have an empty constructor or an @Inject constructor.",
                         ProblemHighlightType.GENERIC_ERROR,
-                        AddDefaultConstructorFix(aClass)
+                        *LocalQuickFix.notNullElements(LocalQuickFix.from(AddDefaultConstructorFix(aClass))),
                     )
                 }
             }
@@ -92,9 +103,11 @@ class SpongePluginClassInspection : AbstractBaseJavaLocalInspectionTool() {
                         ctorIdentifier,
                         "Plugin class empty constructor must not be private.",
                         ProblemHighlightType.GENERIC_ERROR,
-                        ModifierFix(emptyCtor, PsiModifier.PACKAGE_LOCAL, true, false),
-                        ModifierFix(emptyCtor, PsiModifier.PROTECTED, true, false),
-                        ModifierFix(emptyCtor, PsiModifier.PUBLIC, true, false)
+                        *LocalQuickFix.notNullElements(
+                            LocalQuickFix.from(ModifierFix(emptyCtor, PsiModifier.PACKAGE_LOCAL, true, false)),
+                            LocalQuickFix.from(ModifierFix(emptyCtor, PsiModifier.PROTECTED, true, false)),
+                            LocalQuickFix.from(ModifierFix(emptyCtor, PsiModifier.PUBLIC, true, false)),
+                        )
                     )
                 }
             }
@@ -108,7 +121,7 @@ class SpongePluginClassInspection : AbstractBaseJavaLocalInspectionTool() {
                 holder.registerProblem(
                     pluginIdValue,
                     "Plugin IDs should be lowercase, and only contain characters from a-z, dashes or underscores," +
-                        " start with a lowercase letter, and not exceed 64 characters."
+                        " start with a lowercase letter, and not exceed 64 characters.",
                 )
             }
         }

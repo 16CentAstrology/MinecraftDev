@@ -1,21 +1,33 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.insight.generation
 
 import com.demonwav.mcdev.asset.GeneralAssets
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.asset.PlatformAssets
 import com.demonwav.mcdev.facet.MinecraftFacet
 import com.demonwav.mcdev.platform.fabric.FabricModuleType
 import com.demonwav.mcdev.platform.forge.ForgeModuleType
 import com.demonwav.mcdev.platform.mcp.McpModuleType
+import com.demonwav.mcdev.platform.neoforge.NeoForgeModuleType
 import com.demonwav.mcdev.util.MinecraftTemplates
 import com.demonwav.mcdev.util.MinecraftVersions
 import com.demonwav.mcdev.util.SemanticVersion
@@ -41,9 +53,9 @@ import org.jetbrains.jps.model.java.JavaModuleSourceRootTypes
 class MinecraftClassCreateAction :
     CreateTemplateInPackageAction<PsiClass>(
         CAPTION,
-        "Class generation for modders",
+        MCDevBundle("generate.class.description"),
         GeneralAssets.MC_TEMPLATE,
-        JavaModuleSourceRootTypes.SOURCES
+        JavaModuleSourceRootTypes.SOURCES,
     ),
     DumbAware {
 
@@ -55,6 +67,7 @@ class MinecraftClassCreateAction :
 
         val module = directory.findModule() ?: return
         val isForge = MinecraftFacet.getInstance(module, ForgeModuleType) != null
+        val isNeoForge = MinecraftFacet.getInstance(module, NeoForgeModuleType) != null
         val isFabric = MinecraftFacet.getInstance(module, FabricModuleType) != null
         val mcVersion = MinecraftFacet.getInstance(module, McpModuleType)?.getSettings()
             ?.minecraftVersion?.let(SemanticVersion::parse)
@@ -81,12 +94,23 @@ class MinecraftClassCreateAction :
                 builder.addKind("Packet", icon, MinecraftTemplates.FORGE_1_18_PACKET_TEMPLATE)
             }
         }
+
+        if (isNeoForge) {
+            val icon = PlatformAssets.NEOFORGE_ICON
+            builder.addKind("Block", icon, MinecraftTemplates.NEOFORGE_BLOCK_TEMPLATE)
+            builder.addKind("Enchantment", icon, MinecraftTemplates.NEOFORGE_ENCHANTMENT_TEMPLATE)
+            builder.addKind("Item", icon, MinecraftTemplates.NEOFORGE_ITEM_TEMPLATE)
+            builder.addKind("Mob Effect", icon, MinecraftTemplates.NEOFORGE_MOB_EFFECT_TEMPLATE)
+            builder.addKind("Packet", icon, MinecraftTemplates.NEOFORGE_PACKET_TEMPLATE)
+        }
+
         if (isFabric) {
             val icon = PlatformAssets.FABRIC_ICON
 
             builder.addKind("Block", icon, MinecraftTemplates.FABRIC_BLOCK_TEMPLATE)
             builder.addKind("Enchantment", icon, MinecraftTemplates.FABRIC_ENCHANTMENT_TEMPLATE)
             builder.addKind("Item", icon, MinecraftTemplates.FABRIC_ITEM_TEMPLATE)
+            builder.addKind("Status Effect", icon, MinecraftTemplates.FABRIC_STATUS_EFFECT_TEMPLATE)
         }
     }
 
@@ -95,9 +119,10 @@ class MinecraftClassCreateAction :
         val module = psi?.findModule() ?: return false
         val isFabricMod = MinecraftFacet.getInstance(module, FabricModuleType) != null
         val isForgeMod = MinecraftFacet.getInstance(module, ForgeModuleType) != null
+        val isNeoForgeMod = MinecraftFacet.getInstance(module, NeoForgeModuleType) != null
         val hasMcVersion = MinecraftFacet.getInstance(module, McpModuleType)?.getSettings()?.minecraftVersion != null
 
-        return (isFabricMod || isForgeMod && hasMcVersion) && super.isAvailable(dataContext)
+        return (isFabricMod || isNeoForgeMod || isForgeMod && hasMcVersion) && super.isAvailable(dataContext)
     }
 
     override fun checkPackageExists(directory: PsiDirectory): Boolean {
@@ -117,7 +142,7 @@ class MinecraftClassCreateAction :
 
     private class ClassInputValidator(
         private val project: Project,
-        private val directory: PsiDirectory
+        private val directory: PsiDirectory,
     ) : InputValidatorEx {
         override fun getErrorText(inputString: String): String? {
             if (inputString.isNotEmpty() && !PsiNameHelper.getInstance(project).isQualifiedName(inputString)) {
@@ -141,6 +166,7 @@ class MinecraftClassCreateAction :
     }
 
     private companion object {
-        private const val CAPTION = "Minecraft Class"
+        private val CAPTION
+            get() = MCDevBundle("generate.class.caption")
     }
 }

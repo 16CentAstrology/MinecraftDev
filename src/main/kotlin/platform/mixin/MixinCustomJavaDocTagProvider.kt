@@ -1,18 +1,27 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin
 
-import com.demonwav.mcdev.platform.mixin.handlers.MixinAnnotationHandler
+import com.demonwav.mcdev.platform.mixin.util.isMixinEntryPoint
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiReference
 import com.intellij.psi.javadoc.CustomJavadocTagProvider
 import com.intellij.psi.javadoc.JavadocTagInfo
@@ -26,20 +35,7 @@ class MixinCustomJavaDocTagProvider : CustomJavadocTagProvider {
 
         override fun isInline() = false
 
-        override fun isValidInContext(element: PsiElement?): Boolean {
-            if (element !is PsiMethod) {
-                return false
-            }
-            val project = element.project
-            for (annotation in element.annotations) {
-                val qName = annotation.qualifiedName ?: continue
-                val handler = MixinAnnotationHandler.forMixinAnnotation(qName, project)
-                if (handler != null && handler.isEntryPoint) {
-                    return true
-                }
-            }
-            return false
-        }
+        override fun isValidInContext(element: PsiElement?) = isMixinEntryPoint(element)
 
         override fun checkTagValue(value: PsiDocTagValue?): String? = null
         override fun getReference(value: PsiDocTagValue?): PsiReference? = null

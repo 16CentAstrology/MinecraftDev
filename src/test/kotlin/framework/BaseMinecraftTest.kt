@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.framework
@@ -22,15 +32,21 @@ import com.intellij.openapi.roots.ModifiableRootModel
 import com.intellij.pom.java.LanguageLevel
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.fixtures.DefaultLightProjectDescriptor
+import org.junit.jupiter.api.BeforeEach
 
 abstract class BaseMinecraftTest(
-    vararg platformTypes: PlatformType
+    vararg platformTypes: PlatformType,
 ) : ProjectBuilderTest(
-    getProjectDescriptor(platformTypes)
+    getProjectDescriptor(platformTypes),
 ) {
-    protected open val resourcePath = "src/test/resources"
-    protected open val packagePath = "com/demonwav/mcdev"
-    protected open val dataPath = ""
+    protected open val testPath = ""
+
+    @BeforeEach
+    fun setUp() {
+        if (testPath.isNotBlank()) {
+            fixture.testDataPath = "$BASE_DATA_PATH/$testPath"
+        }
+    }
 }
 
 fun getProjectDescriptor(platformTypes: Array<out PlatformType>): LightProjectDescriptor {

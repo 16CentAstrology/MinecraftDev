@@ -1,46 +1,60 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.bukkit.generation
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.insight.generation.GenerationData
 import com.demonwav.mcdev.insight.generation.ui.EventGenerationPanel
+import com.intellij.openapi.observable.properties.PropertyGraph
 import com.intellij.psi.PsiClass
-import javax.swing.JCheckBox
-import javax.swing.JComboBox
+import com.intellij.ui.dsl.builder.bindItem
+import com.intellij.ui.dsl.builder.bindSelected
+import com.intellij.ui.dsl.builder.panel
 import javax.swing.JPanel
 
 class BukkitEventGenerationPanel(chosenClass: PsiClass) : EventGenerationPanel(chosenClass) {
 
-    private lateinit var ignoreCanceledCheckBox: JCheckBox
-    private lateinit var parentPanel: JPanel
-    private lateinit var eventPriorityComboBox: JComboBox<String>
+    private val graph = PropertyGraph("BukkitEventGenerationPanel graph")
 
-    override val panel: JPanel?
-        get() {
-            ignoreCanceledCheckBox.isSelected = true
+    private val ignoreCanceledProperty = graph.property(true)
+    private val eventPriorityProperty = graph.property("NORMAL")
 
-            // Not static because the form builder is not reliable
-            eventPriorityComboBox.addItem("MONITOR")
-            eventPriorityComboBox.addItem("HIGHEST")
-            eventPriorityComboBox.addItem("HIGH")
-            eventPriorityComboBox.addItem("NORMAL")
-            eventPriorityComboBox.addItem("LOW")
-            eventPriorityComboBox.addItem("LOWEST")
+    override val panel: JPanel by lazy {
+        panel {
+            row {
+                checkBox(MCDevBundle("generate.event_listener.ignore_if_canceled"))
+                    .bindSelected(ignoreCanceledProperty)
+            }
 
-            eventPriorityComboBox.selectedIndex = 3
-
-            return parentPanel
+            row(MCDevBundle("generate.event_listener.event_priority")) {
+                comboBox(listOf("MONITOR", "HIGHEST", "HIGH", "NORMAL", "LOW", "LOWEST"))
+                    .bindItem(eventPriorityProperty)
+            }
         }
+    }
 
-    override fun gatherData(): GenerationData? {
-        return BukkitGenerationData(ignoreCanceledCheckBox.isSelected, eventPriorityComboBox.selectedItem.toString())
+    override fun gatherData(): GenerationData {
+        return BukkitGenerationData(
+            ignoreCanceledProperty.get(),
+            eventPriorityProperty.get()
+        )
     }
 }

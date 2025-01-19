@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp
@@ -13,8 +23,12 @@ package com.demonwav.mcdev.platform.mcp
 import com.demonwav.mcdev.facet.MinecraftFacet
 import com.demonwav.mcdev.platform.AbstractModule
 import com.demonwav.mcdev.platform.PlatformType
-import com.demonwav.mcdev.platform.mcp.srg.SrgManager
+import com.demonwav.mcdev.platform.mcp.mappings.MappingsManager
+import com.demonwav.mcdev.platform.mcp.util.McpConstants
 import com.demonwav.mcdev.translations.TranslationFileListener
+import com.demonwav.mcdev.util.runWriteTaskLater
+import com.intellij.json.JsonFileType
+import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.PsiClass
@@ -29,13 +43,17 @@ class McpModule(facet: MinecraftFacet) : AbstractModule(facet) {
     private val settings: McpModuleSettings = McpModuleSettings.getInstance(module)
     val accessTransformers = mutableSetOf<VirtualFile>()
 
-    var srgManager: SrgManager? = null
+    var mappingsManager: MappingsManager? = null
         private set
 
     override fun init() {
         initSrg()
         connection = project.messageBus.connect()
         connection.subscribe(VirtualFileManager.VFS_CHANGES, TranslationFileListener)
+
+        runWriteTaskLater {
+            FileTypeManager.getInstance().associatePattern(JsonFileType.INSTANCE, McpConstants.PNG_MCMETA)
+        }
     }
 
     private fun initSrg() {
@@ -43,8 +61,8 @@ class McpModule(facet: MinecraftFacet) : AbstractModule(facet) {
         val file = settings.mappingFile ?: return
         val srgType = settings.srgType ?: return
 
-        srgManager = SrgManager.getInstance(file, srgType)
-        srgManager?.parse()
+        mappingsManager = MappingsManager.getInstance(file, srgType)
+        mappingsManager?.parse()
     }
 
     override val moduleType = McpModuleType
@@ -60,8 +78,8 @@ class McpModule(facet: MinecraftFacet) : AbstractModule(facet) {
         val mappingFile = data.mappingFile ?: return
         val srgType = data.srgType ?: return
 
-        srgManager = SrgManager.getInstance(mappingFile, srgType)
-        srgManager?.parse()
+        mappingsManager = MappingsManager.getInstance(mappingFile, srgType)
+        mappingsManager?.parse()
     }
 
     fun addAccessTransformerFile(file: VirtualFile) {
@@ -73,6 +91,6 @@ class McpModule(facet: MinecraftFacet) : AbstractModule(facet) {
 
         connection.disconnect()
         accessTransformers.clear()
-        srgManager = null
+        mappingsManager = null
     }
 }

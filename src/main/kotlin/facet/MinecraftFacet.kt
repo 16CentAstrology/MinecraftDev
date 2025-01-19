@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.facet
@@ -18,6 +28,7 @@ import com.demonwav.mcdev.platform.PlatformType
 import com.demonwav.mcdev.util.SourceType
 import com.demonwav.mcdev.util.filterNotNull
 import com.demonwav.mcdev.util.mapFirstNotNull
+import com.demonwav.mcdev.util.runWriteActionAndWait
 import com.google.common.collect.HashMultimap
 import com.intellij.facet.Facet
 import com.intellij.facet.FacetManager
@@ -25,6 +36,7 @@ import com.intellij.facet.FacetTypeId
 import com.intellij.facet.FacetTypeRegistry
 import com.intellij.ide.projectView.ProjectView
 import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleGrouper
 import com.intellij.openapi.module.ModuleManager
@@ -33,9 +45,9 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
+import com.intellij.util.application
 import java.util.concurrent.ConcurrentHashMap
 import javax.swing.Icon
-import kotlin.jvm.Throws
 import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.jetbrains.jps.model.java.JavaSourceRootType
 
@@ -43,7 +55,7 @@ class MinecraftFacet(
     module: Module,
     name: String,
     configuration: MinecraftFacetConfiguration,
-    underlyingFacet: Facet<*>?
+    underlyingFacet: Facet<*>?,
 ) : Facet<MinecraftFacetConfiguration>(facetType, module, name, configuration, underlyingFacet) {
 
     private val moduleMap = ConcurrentHashMap<AbstractModuleType<*>, AbstractModule>()
@@ -65,9 +77,9 @@ class MinecraftFacet(
         roots.clear()
     }
 
-    fun refresh() {
+    fun refresh() = runWriteActionAndWait {
         if (module.isDisposed) {
-            return
+            return@runWriteActionAndWait
         }
 
         // Don't allow parent types with child types in auto detected set
@@ -105,29 +117,35 @@ class MinecraftFacet(
             }
 
         newlyEnabled.forEach(AbstractModule::init)
+        modules.forEach(AbstractModule::refresh)
 
         ProjectView.getInstance(module.project).refresh()
     }
 
-    private fun updateRoots() {
+    private fun updateRoots() = runWriteAction {
+        if (module.isDisposed) {
+            return@runWriteAction
+        }
+
         roots.clear()
         val rootManager = ModuleRootManager.getInstance(module)
 
-        rootManager.contentEntries.asSequence()
-            .flatMap { entry -> entry.sourceFolders.asSequence() }
-            .filterNotNull { it.file }
-            .forEach {
-                when (it.rootType) {
-                    JavaSourceRootType.SOURCE -> roots.put(SourceType.SOURCE, it.file)
-                    JavaSourceRootType.TEST_SOURCE -> roots.put(SourceType.TEST_SOURCE, it.file)
-                    JavaResourceRootType.RESOURCE -> roots.put(SourceType.RESOURCE, it.file)
-                    JavaResourceRootType.TEST_RESOURCE -> roots.put(SourceType.TEST_RESOURCE, it.file)
+        runWriteActionAndWait {
+            rootManager.contentEntries.asSequence()
+                .flatMap { entry -> entry.sourceFolders.asSequence() }
+                .filterNotNull { it.file }
+                .forEach {
+                    when (it.rootType) {
+                        JavaSourceRootType.SOURCE -> roots.put(SourceType.SOURCE, it.file)
+                        JavaSourceRootType.TEST_SOURCE -> roots.put(SourceType.TEST_SOURCE, it.file)
+                        JavaResourceRootType.RESOURCE -> roots.put(SourceType.RESOURCE, it.file)
+                        JavaResourceRootType.TEST_RESOURCE -> roots.put(SourceType.TEST_RESOURCE, it.file)
+                    }
                 }
-            }
+        }
     }
 
     private fun register(type: AbstractModuleType<*>): AbstractModule {
-        type.performCreationSettingSetup(module.project)
         val module = type.generateModule(this)
         moduleMap[type] = module
         return module
@@ -218,7 +236,7 @@ class MinecraftFacet(
     private class RefreshRootsException : Exception()
 
     @Throws(RefreshRootsException::class)
-    private fun findFile0(path: String, type: SourceType): VirtualFile? {
+    private fun findFile0(path: String, type: SourceType): VirtualFile? = application.runReadAction<VirtualFile?> {
         val roots = roots[type]
 
         for (root in roots) {
@@ -226,17 +244,17 @@ class MinecraftFacet(
             if (!r.isValid) {
                 throw RefreshRootsException()
             }
-            return r.findFileByRelativePath(path) ?: continue
+            return@runReadAction r.findFileByRelativePath(path) ?: continue
         }
 
-        return null
+        return@runReadAction null
     }
 
     companion object {
         val ID = FacetTypeId<MinecraftFacet>(TYPE_ID)
 
         val facetType: MinecraftFacetType
-            get() = FacetTypeRegistry.getInstance().findFacetType(ID) as MinecraftFacetType
+            get() = facetTypeOrNull as MinecraftFacetType
 
         val facetTypeOrNull: MinecraftFacetType?
             get() = FacetTypeRegistry.getInstance().findFacetType(TYPE_ID) as? MinecraftFacetType

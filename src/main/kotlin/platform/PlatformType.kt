@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform
@@ -28,12 +38,12 @@ import com.demonwav.mcdev.platform.fabric.FabricModuleType
 import com.demonwav.mcdev.platform.fabric.framework.FABRIC_LIBRARY_KIND
 import com.demonwav.mcdev.platform.forge.ForgeModuleType
 import com.demonwav.mcdev.platform.forge.framework.FORGE_LIBRARY_KIND
-import com.demonwav.mcdev.platform.liteloader.LiteLoaderModuleType
-import com.demonwav.mcdev.platform.liteloader.framework.LITELOADER_LIBRARY_KIND
 import com.demonwav.mcdev.platform.mcp.McpModuleType
 import com.demonwav.mcdev.platform.mcp.framework.MCP_LIBRARY_KIND
 import com.demonwav.mcdev.platform.mixin.MixinModuleType
 import com.demonwav.mcdev.platform.mixin.framework.MIXIN_LIBRARY_KIND
+import com.demonwav.mcdev.platform.neoforge.NeoForgeModuleType
+import com.demonwav.mcdev.platform.neoforge.framework.NEOFORGE_LIBRARY_KIND
 import com.demonwav.mcdev.platform.sponge.SpongeModuleType
 import com.demonwav.mcdev.platform.sponge.framework.SPONGE_LIBRARY_KIND
 import com.demonwav.mcdev.platform.velocity.VelocityModuleType
@@ -42,25 +52,25 @@ import com.intellij.openapi.roots.libraries.LibraryKind
 
 enum class PlatformType(
     val type: AbstractModuleType<*>,
-    val normalName: String,
     val versionJson: String? = null,
-    private val parent: PlatformType? = null
+    private val parent: PlatformType? = null,
 ) {
 
-    BUKKIT(BukkitModuleType, "Bukkit", "bukkit.json"),
-    SPIGOT(SpigotModuleType, "Spigot", "spigot.json", BUKKIT),
-    PAPER(PaperModuleType, "Paper", "paper.json", SPIGOT),
-    ARCHITECTURY(ArchitecturyModuleType, "Architectury"),
-    FORGE(ForgeModuleType, "Forge"),
-    FABRIC(FabricModuleType, "Fabric"),
-    SPONGE(SpongeModuleType, "Sponge"),
-    BUNGEECORD(BungeeCordModuleType, "BungeeCord", "bungeecord_v2.json"),
-    WATERFALL(WaterfallModuleType, "Waterfall", "waterfall.json", BUNGEECORD),
-    VELOCITY(VelocityModuleType, "Velocity", "velocity.json"),
-    LITELOADER(LiteLoaderModuleType, "LiteLoader"),
-    MIXIN(MixinModuleType, "Mixin"),
-    MCP(McpModuleType, "MCP"),
-    ADVENTURE(AdventureModuleType, "Adventure");
+    BUKKIT(BukkitModuleType, "bukkit.json"),
+    SPIGOT(SpigotModuleType, "spigot.json", BUKKIT),
+    PAPER(PaperModuleType, "paper.json", SPIGOT),
+    ARCHITECTURY(ArchitecturyModuleType),
+    FORGE(ForgeModuleType),
+    FABRIC(FabricModuleType),
+    SPONGE(SpongeModuleType),
+    BUNGEECORD(BungeeCordModuleType, "bungeecord_v2.json"),
+    WATERFALL(WaterfallModuleType, "waterfall.json", BUNGEECORD),
+    VELOCITY(VelocityModuleType, "velocity.json"),
+    MIXIN(MixinModuleType),
+    NEOFORGE(NeoForgeModuleType),
+    MCP(McpModuleType),
+    ADVENTURE(AdventureModuleType),
+    ;
 
     private val children = mutableListOf<PlatformType>()
 
@@ -74,8 +84,11 @@ enum class PlatformType(
     }
 
     companion object {
-        fun removeParents(types: MutableSet<PlatformType>) =
-            types.filter { type -> type.children.isEmpty() || types.none { type.children.contains(it) } }.toHashSet()
+        fun removeParents(types: Set<PlatformType?>) =
+            types.asSequence()
+                .filterNotNull()
+                .filter { type -> type.children.isEmpty() || types.none { type.children.contains(it) } }
+                .toHashSet()
 
         fun fromLibraryKind(kind: LibraryKind) = when (kind) {
             BUKKIT_LIBRARY_KIND -> BUKKIT
@@ -85,13 +98,13 @@ enum class PlatformType(
             ARCHITECTURY_LIBRARY_KIND -> ARCHITECTURY
             FORGE_LIBRARY_KIND -> FORGE
             FABRIC_LIBRARY_KIND -> FABRIC
-            LITELOADER_LIBRARY_KIND -> LITELOADER
             MCP_LIBRARY_KIND -> MCP
             MIXIN_LIBRARY_KIND -> MIXIN
             BUNGEECORD_LIBRARY_KIND -> BUNGEECORD
             WATERFALL_LIBRARY_KIND -> WATERFALL
             VELOCITY_LIBRARY_KIND -> VELOCITY
             ADVENTURE_LIBRARY_KIND -> ADVENTURE
+            NEOFORGE_LIBRARY_KIND -> NEOFORGE
             else -> null
         }
     }

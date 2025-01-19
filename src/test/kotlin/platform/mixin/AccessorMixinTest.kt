@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin
@@ -55,7 +65,7 @@ class AccessorMixinTest : BaseMixinTest() {
             @Invoker void invoke();
             @Invoker double doThing();
         }
-        """
+        """,
     ) { psiClass ->
         Assertions.assertTrue(psiClass.isAccessorMixin)
     }
@@ -79,7 +89,7 @@ class AccessorMixinTest : BaseMixinTest() {
             @Invoker void invoke();
             double doThing();
         }
-        """
+        """,
     ) { psiClass ->
         Assertions.assertFalse(psiClass.isAccessorMixin)
     }
@@ -103,7 +113,7 @@ class AccessorMixinTest : BaseMixinTest() {
             @Invoker void invoke();
             @Invoker double doThing();
         }
-        """
+        """,
     ) { psiClass ->
         Assertions.assertFalse(psiClass.isAccessorMixin)
     }
@@ -124,7 +134,7 @@ class AccessorMixinTest : BaseMixinTest() {
             @Accessor String getString();
             @Accessor int getInt();
         }
-        """
+        """,
     ) { psiClass ->
         Assertions.assertTrue(psiClass.isAccessorMixin)
     }
@@ -145,7 +155,7 @@ class AccessorMixinTest : BaseMixinTest() {
             @Invoker void invoke();
             @Invoker double doThing();
         }
-        """
+        """,
     ) { psiClass ->
         Assertions.assertTrue(psiClass.isAccessorMixin)
     }
@@ -167,7 +177,7 @@ class AccessorMixinTest : BaseMixinTest() {
             @Accessor String getString();
             @Invoker void invoke();
         }
-        """
+        """,
     ) { psiClass ->
         Assertions.assertFalse(psiClass.isAccessorMixin)
     }
@@ -189,7 +199,7 @@ class AccessorMixinTest : BaseMixinTest() {
             @Accessor String getString();
             @Invoker void invoke();
         }
-        """
+        """,
     ) { psiClass ->
         Assertions.assertFalse(psiClass.isAccessorMixin)
     }
@@ -218,7 +228,7 @@ class AccessorMixinTest : BaseMixinTest() {
             @Invoker String callPrivateMethod();
             @Invoker static MixinBase createMixinBase() { return null; }
         }
-        """
+        """,
     ) {
         fixture.enableInspections(MixinAnnotationTargetInspection::class.java)
         fixture.checkHighlighting(false, false, false)
@@ -243,7 +253,7 @@ class AccessorMixinTest : BaseMixinTest() {
             @Invoker("privateMethod") String foo3();
             @Invoker("<init>") MixinBase foo4();
         }
-        """
+        """,
     ) {
         fixture.enableInspections(MixinAnnotationTargetInspection::class.java)
         fixture.checkHighlighting(false, false, false)
@@ -264,7 +274,7 @@ class AccessorMixinTest : BaseMixinTest() {
         public interface AccessorMixinTargetMixin {
             @<error descr="Cannot find field foo in target class">Accessor</error> String getFoo();
         }
-        """
+        """,
     ) {
         fixture.enableInspections(MixinAnnotationTargetInspection::class.java)
         fixture.checkHighlighting(false, false, false)
@@ -285,7 +295,7 @@ class AccessorMixinTest : BaseMixinTest() {
         public interface AccessorMixinTargetMixin {
             @<error descr="Cannot find field foo in target class">Accessor</error>("foo") String bar();
         }
-        """
+        """,
     ) {
         fixture.enableInspections(MixinAnnotationTargetInspection::class.java)
         fixture.checkHighlighting(false, false, false)
@@ -306,7 +316,7 @@ class AccessorMixinTest : BaseMixinTest() {
         public interface AccessorMixinTargetMixin {
             @<error descr="Cannot find method foo in target class">Invoker</error> String callFoo();
         }
-        """
+        """,
     ) {
         fixture.enableInspections(MixinAnnotationTargetInspection::class.java)
         fixture.checkHighlighting(false, false, false)
@@ -327,7 +337,7 @@ class AccessorMixinTest : BaseMixinTest() {
         public interface AccessorMixinTargetMixin {
             @<error descr="Cannot find method foo in target class">Invoker</error>("foo") String bar();
         }
-        """
+        """,
     ) {
         fixture.enableInspections(MixinAnnotationTargetInspection::class.java)
         fixture.checkHighlighting(false, false, false)
@@ -348,7 +358,7 @@ class AccessorMixinTest : BaseMixinTest() {
         public interface AccessorMixinTargetMixin {
             @<error descr="Cannot find method <init> in target class">Invoker</error>("<init>") String construct(String invalidArg);
         }
-        """
+        """,
     ) {
         fixture.enableInspections(MixinAnnotationTargetInspection::class.java)
         fixture.checkHighlighting(false, false, false)

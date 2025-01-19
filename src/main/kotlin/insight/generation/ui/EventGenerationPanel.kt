@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.insight.generation.ui
@@ -33,12 +43,10 @@ open class EventGenerationPanel(val chosenClass: PsiClass) {
     /**
      * This is called when the dialog is closing from the OK action. The platform should fill in their [GenerationData] object as
      * needed for whatever information their panel provides. The state of the panel can be assumed to be valid, since this will only be
-     * called if [.doValidate] has passed successfully.
+     * called if [doValidate] has passed successfully.
 
      * @return The [GenerationData] object which will be passed to the
-     * * [AbstractModule#doPreEventGenerate()][com.demonwav.mcdev.platform.AbstractModule.doPreEventGenerate] and
-     * * [AbstractModule#generateEventListenerMethod][com.demonwav.mcdev.platform.AbstractModule.generateEventListenerMethod]
-     * * methods.
+     * [EventListenerGenerationSupport][com.demonwav.mcdev.insight.generation.EventListenerGenerationSupport]
      */
     open fun gatherData(): GenerationData? {
         return null

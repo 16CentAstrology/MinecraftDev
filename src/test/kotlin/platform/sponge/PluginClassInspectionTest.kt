@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.sponge
@@ -46,7 +56,7 @@ class PluginClassInspectionTest : BaseSpongeTest() {
                 ASpongePlugin() {
                 }
             }
-            """
+            """,
         )
     }
 
@@ -62,7 +72,7 @@ class PluginClassInspectionTest : BaseSpongeTest() {
             @Plugin(id = "a-plugin")
             public class ASpongePlugin {
             }
-            """
+            """,
         )
     }
 
@@ -80,7 +90,7 @@ class PluginClassInspectionTest : BaseSpongeTest() {
                 private <error descr="Plugin class empty constructor must not be private.">ASpongePlugin</error>() {
                 }
             }
-            """
+            """,
         )
     }
 
@@ -104,7 +114,7 @@ class PluginClassInspectionTest : BaseSpongeTest() {
                 private ASpongePlugin(Logger logger) {
                 }
             }
-            """
+            """,
         )
     }
 
@@ -125,7 +135,7 @@ class PluginClassInspectionTest : BaseSpongeTest() {
                 private ASpongePlugin(Logger logger) {
                 }
             }
-            """
+            """,
         )
     }
 }

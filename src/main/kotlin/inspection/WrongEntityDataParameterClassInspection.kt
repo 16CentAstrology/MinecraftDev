@@ -1,15 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.inspection
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.util.findContainingClass
 import com.demonwav.mcdev.util.fullQualifiedName
 import com.intellij.codeInspection.AbstractBaseJavaLocalInspectionTool
@@ -29,17 +40,12 @@ import com.intellij.psi.util.InheritanceUtil
 
 class WrongEntityDataParameterClassInspection : AbstractBaseJavaLocalInspectionTool() {
 
-    override fun getStaticDescription() = "Reports when the class passed to an entity data parameter definition is " +
-        "not the same as the containing entity class"
-
+    override fun getStaticDescription() = MCDevBundle("inspection.entity_data_param.description")
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor = Visitor(holder)
 
     class Visitor(private val holder: ProblemsHolder) : JavaElementVisitor() {
-        override fun visitMethodCallExpression(expression: PsiMethodCallExpression?) {
+        override fun visitMethodCallExpression(expression: PsiMethodCallExpression) {
             super.visitMethodCallExpression(expression)
-            if (expression == null) {
-                return
-            }
 
             val method = expression.resolveMethod() ?: return
             val className = method.containingClass?.fullQualifiedName ?: return
@@ -59,15 +65,15 @@ class WrongEntityDataParameterClassInspection : AbstractBaseJavaLocalInspectionT
             if (!containingClass.manager.areElementsEquivalent(containingClass, firstParameterGenericsClass)) {
                 holder.registerProblem(
                     expression,
-                    "Entity class does not match this entity class",
-                    QuickFix(firstParameter)
+                    MCDevBundle("inspection.entity_data_param.message"),
+                    QuickFix(firstParameter),
                 )
             }
         }
     }
 
     private class QuickFix(firstParameter: PsiExpression) : LocalQuickFixOnPsiElement(firstParameter) {
-        override fun getText() = "Replace other entity class with this entity class"
+        override fun getText() = MCDevBundle("inspection.entity_data_param.fix")
 
         override fun invoke(project: Project, file: PsiFile, startElement: PsiElement, endElement: PsiElement) {
             val factory = JavaPsiFacade.getElementFactory(project)
@@ -77,8 +83,8 @@ class WrongEntityDataParameterClassInspection : AbstractBaseJavaLocalInspectionT
             firstParameter.replace(
                 factory.createExpressionFromText(
                     "${containingClass.name}.class",
-                    firstParameter
-                )
+                    firstParameter,
+                ),
             )
         }
 
@@ -93,12 +99,12 @@ class WrongEntityDataParameterClassInspection : AbstractBaseJavaLocalInspectionT
         private val ENTITY_DATA_MANAGER_CLASSES = setOf(
             "net.minecraft.network.datasync.EntityDataManager",
             "net.minecraft.network.syncher.SynchedEntityData",
-            "net.minecraft.entity.data.DataTracker"
+            "net.minecraft.entity.data.DataTracker",
         )
         private val DEFINE_ID_METHODS = setOf(
             "defineId",
             "createKey",
-            "registerData"
+            "registerData",
         )
 
         private fun isEntitySubclass(clazz: PsiClass): Boolean =

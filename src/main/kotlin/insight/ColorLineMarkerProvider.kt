@@ -1,16 +1,28 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.insight
 
 import com.demonwav.mcdev.MinecraftSettings
+import com.demonwav.mcdev.asset.MCDevBundle
+import com.demonwav.mcdev.util.runCatchingKtIdeaExceptions
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler
 import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.LineMarkerProvider
@@ -22,7 +34,7 @@ import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.psi.JVMElementFactories
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiEditorUtil
-import com.intellij.ui.ColorChooser
+import com.intellij.ui.ColorChooserService
 import com.intellij.util.FunctionUtil
 import com.intellij.util.ui.ColorIcon
 import com.intellij.util.ui.ColorsIcon
@@ -42,9 +54,11 @@ class ColorLineMarkerProvider : LineMarkerProvider {
         }
 
         val identifier = element.toUElementOfType<UIdentifier>() ?: return null
-        val info = identifier.findColor { map, chosen -> ColorInfo(element, chosen.value, map, chosen.key, identifier) }
+        val info = runCatchingKtIdeaExceptions {
+            identifier.findColor { map, chosen -> ColorInfo(element, chosen.value, map, chosen.key, identifier) }
+        }
         if (info != null) {
-            NavigateAction.setNavigateAction(info, "Change Color", null)
+            NavigateAction.setNavigateAction(info, MCDevBundle("generate.color.change_action"), null)
         }
 
         return info
@@ -58,7 +72,7 @@ class ColorLineMarkerProvider : LineMarkerProvider {
             color: Color,
             map: Map<String, Color>,
             colorName: String,
-            workElement: UElement
+            workElement: UElement,
         ) : super(
             element,
             element.textRange,
@@ -71,14 +85,14 @@ class ColorLineMarkerProvider : LineMarkerProvider {
 
                 val editor = PsiEditorUtil.findEditor(psiElement) ?: return@handler
 
-                val picker = ColorPicker(map, editor.component)
+                val picker = ColorPicker(map, element.project, editor.component)
                 val newColor = picker.showDialog()
                 if (newColor != null && map[newColor] != color) {
                     workElement.setColor(newColor)
                 }
             },
             GutterIconRenderer.Alignment.RIGHT,
-            { "$colorName color indicator" }
+            { "$colorName color indicator" },
         ) {
             this.color = color
         }
@@ -90,7 +104,7 @@ class ColorLineMarkerProvider : LineMarkerProvider {
             FunctionUtil.nullConstant<Any, String>(),
             handler,
             GutterIconRenderer.Alignment.RIGHT,
-            { "color indicator" }
+            { "color indicator" },
         ) {
             this.color = color
         }
@@ -113,8 +127,8 @@ class ColorLineMarkerProvider : LineMarkerProvider {
     class CommonColorInfo(
         element: PsiElement,
         color: Color,
-        workElement: UElement
-    ) : ColorLineMarkerProvider.ColorInfo(
+        workElement: UElement,
+    ) : ColorInfo(
         element,
         color,
         GutterIconNavigationHandler handler@{ _, psiElement ->
@@ -130,17 +144,42 @@ class ColorLineMarkerProvider : LineMarkerProvider {
                 // implement it yet. It is better to not display the color chooser at all than deceiving users after
                 // after they chose a color
                 HintManager.getInstance()
-                    .showErrorHint(editor, "Can't change colors in " + psiElement.language.displayName)
+                    .showErrorHint(editor, MCDevBundle("generate.color.change_error", psiElement.language.displayName))
                 return@handler
             }
 
-            val c = ColorChooser.chooseColor(psiElement.project, editor.component, "Choose Color", color, false)
+            val actionText = MCDevBundle("generate.color.choose_action")
+            val c = ColorChooserService.instance.showDialog(psiElement.project, editor.component, actionText, color)
                 ?: return@handler
             when (workElement) {
-                is ULiteralExpression -> workElement.setColor(c.rgb and 0xFFFFFF)
-                is UCallExpression -> workElement.setColor(c.red, c.green, c.blue)
+                is ULiteralExpression -> {
+                    val currentValue = workElement.evaluate()
+                    if (currentValue is Int) {
+                        workElement.setColor(c.rgb and 0xFFFFFF)
+                    } else if (currentValue is String) {
+                        if (currentValue.length == 4) {
+                            val hexString = "#" +
+                                Integer.toUnsignedString(c.red, 16).first() +
+                                Integer.toUnsignedString(c.green, 16).first() +
+                                Integer.toUnsignedString(c.blue, 16).first()
+                            workElement.setColor(hexString, true)
+                        } else {
+                            val hexString = "#" + Integer.toUnsignedString(c.rgb, 16).substring(2)
+                            workElement.setColor(hexString, true)
+                        }
+                    }
+                }
+
+                is UCallExpression -> {
+                    if (workElement.methodName == "hsvLike") {
+                        val (h, s, v) = Color.RGBtoHSB(c.red, c.green, c.blue, null)
+                        workElement.setColorHSV(h, s, v)
+                    }
+
+                    workElement.setColor(c.red, c.green, c.blue)
+                }
             }
-        }
+        },
     )
 
     abstract class CommonLineMarkerProvider : LineMarkerProvider {
@@ -148,7 +187,7 @@ class ColorLineMarkerProvider : LineMarkerProvider {
             val pair = findColor(element) ?: return null
 
             val info = CommonColorInfo(element, pair.first, pair.second)
-            NavigateAction.setNavigateAction(info, "Change color", null)
+            NavigateAction.setNavigateAction(info, MCDevBundle("generate.color.change_action"), null)
 
             return info
         }

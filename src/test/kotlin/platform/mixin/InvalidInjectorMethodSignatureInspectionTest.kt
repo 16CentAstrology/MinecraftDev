@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin
@@ -55,7 +65,7 @@ class InvalidInjectorMethodSignatureInspectionTest : BaseMixinTest() {
                 private void redirectMethod2() {
                 }
             }
-            """
+            """,
         )
     }
 
@@ -88,10 +98,10 @@ class InvalidInjectorMethodSignatureInspectionTest : BaseMixinTest() {
                 }
 
                 @Inject(method = "<init>(Lcom/demonwav/mcdev/mixintestdata/invalidInjectorMethodSignatureInspection/MixedInOuter;Ljava/lang/String;)V", at = @At("RETURN"))
-                private void injectCtor<error descr="Method parameters do not match expected parameters for Inject">(String string, CallbackInfo ci)</error> {
+                private <error descr="Method signature does not match expected signature for Inject">void injectCtor(String string, CallbackInfo ci)</error> {
                 }
             }
-            """
+            """,
         )
     }
 
@@ -112,7 +122,7 @@ class InvalidInjectorMethodSignatureInspectionTest : BaseMixinTest() {
             public class TestMixin {
 
                 @Inject(method = "<init>()V", at = @At("RETURN"))
-                private void injectCtorWrong<error descr="Method parameters do not match expected parameters for Inject">(MixedInOuter outer, CallbackInfo ci)</error> {
+                private <error descr="Method signature does not match expected signature for Inject">void injectCtorWrong(MixedInOuter outer, CallbackInfo ci)</error> {
                 }
 
                 @Inject(method = "<init>", at = @At("RETURN"))
@@ -120,14 +130,14 @@ class InvalidInjectorMethodSignatureInspectionTest : BaseMixinTest() {
                 }
 
                 @Inject(method = "<init>(Ljava/lang/String;)V", at = @At("RETURN"))
-                private void injectCtor<error descr="Method parameters do not match expected parameters for Inject">(MixedInOuter outer, String string, CallbackInfo ci)</error> {
+                private <error descr="Method signature does not match expected signature for Inject">void injectCtor(MixedInOuter outer, String string, CallbackInfo ci)</error> {
                 }
 
                 @Inject(method = "<init>(Ljava/lang/String;)V", at = @At("RETURN"))
                 private void injectCtor(String string, CallbackInfo ci) {
                 }
             }
-            """
+            """,
         )
     }
 }

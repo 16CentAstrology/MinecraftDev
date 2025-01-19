@@ -1,19 +1,28 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.inspections
 
-import com.demonwav.mcdev.facet.MinecraftFacet
-import com.demonwav.mcdev.platform.mcp.McpModuleType
-import com.demonwav.mcdev.platform.mcp.srg.SrgMemberReference
-import com.demonwav.mcdev.util.MemberReference
+import com.demonwav.mcdev.platform.mcp.mappings.getMappedClass
+import com.demonwav.mcdev.platform.mcp.mappings.getMappedField
+import com.demonwav.mcdev.platform.mcp.mappings.getMappedMethod
 import com.demonwav.mcdev.util.findModule
 import com.demonwav.mcdev.util.fullQualifiedName
 import com.intellij.codeInspection.ProblemDescriptor
@@ -26,6 +35,7 @@ import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiExpression
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiReferenceExpression
+import com.intellij.psi.util.createSmartPointer
 import com.siyeh.ig.BaseInspection
 import com.siyeh.ig.BaseInspectionVisitor
 import com.siyeh.ig.InspectionGadgetsFix
@@ -33,10 +43,7 @@ import org.jetbrains.annotations.Nls
 
 class StackEmptyInspection : BaseInspection() {
     companion object {
-        const val STACK_FQ_NAME = "net.minecraft.item.ItemStack"
-        val STACK_JVM_NAME = STACK_FQ_NAME.replace('.', '/')
-        val EMPTY_SRG = SrgMemberReference.parse("$STACK_JVM_NAME/field_190927_a")
-        val IS_EMPTY_SRG = SrgMemberReference.parse("$STACK_JVM_NAME/func_190926_b")
+        const val STACK_FQ_NAME = "net.minecraft.world.item.ItemStack"
     }
 
     @Nls
@@ -52,16 +59,19 @@ class StackEmptyInspection : BaseInspection() {
             "When a stack in an inventory is shrunk, the instance is not replaced with ItemStack.EMPTY, but" +
             " the stack should still be considered empty. Instead, isEmpty() should be called."
 
-    override fun buildFix(vararg infos: Any): InspectionGadgetsFix? {
+    override fun buildFix(vararg infos: Any): InspectionGadgetsFix {
+        val compareExpressionPointer = (infos[0] as PsiExpression).createSmartPointer()
+        val binaryExpressionPointer = (infos[2] as PsiBinaryExpression).createSmartPointer()
         return object : InspectionGadgetsFix() {
             override fun getFamilyName() = "Replace with .isEmpty()"
 
             override fun doFix(project: Project, descriptor: ProblemDescriptor) {
-                val compareExpression = infos[0] as PsiExpression
-                val binaryExpression = infos[2] as PsiBinaryExpression
                 val elementFactory = JavaPsiFacade.getElementFactory(project)
 
-                val mappedIsEmpty = compareExpression.findModule()?.getMappedMethod(IS_EMPTY_SRG)?.name ?: "isEmpty"
+                val compareExpression = compareExpressionPointer.element ?: return
+                val binaryExpression = binaryExpressionPointer.element ?: return
+
+                val mappedIsEmpty = compareExpression.findModule()?.getMappedMethod(STACK_FQ_NAME, "isEmpty", "()Z")
 
                 var expressionText = "${compareExpression.text}.$mappedIsEmpty()"
 
@@ -87,9 +97,10 @@ class StackEmptyInspection : BaseInspection() {
                     val rightExpression = expression.rOperand
 
                     // Check if both operands evaluate to an ItemStack
-                    if (isExpressionStack(leftExpression) && isExpressionStack(rightExpression)) {
-                        val leftEmpty = isExpressionEmptyConstant(leftExpression)
-                        val rightEmpty = isExpressionEmptyConstant(rightExpression)
+                    val module = expression.findModule() ?: return
+                    if (isExpressionStack(module, leftExpression) && isExpressionStack(module, rightExpression)) {
+                        val leftEmpty = isExpressionEmptyConstant(module, leftExpression)
+                        val rightEmpty = isExpressionEmptyConstant(module, rightExpression)
 
                         // Check that only one of the references are ItemStack.EMPTY
                         if (leftEmpty xor rightEmpty) {
@@ -103,26 +114,18 @@ class StackEmptyInspection : BaseInspection() {
                 }
             }
 
-            private fun isExpressionStack(expression: PsiExpression?): Boolean {
-                return (expression?.type as? PsiClassType)?.resolve()?.fullQualifiedName == STACK_FQ_NAME
+            private fun isExpressionStack(module: Module, expression: PsiExpression?): Boolean {
+                val fqn = (expression?.type as? PsiClassType)?.resolve()?.fullQualifiedName
+                return fqn == module.getMappedClass(STACK_FQ_NAME)
             }
 
-            private fun isExpressionEmptyConstant(expression: PsiExpression?): Boolean {
+            private fun isExpressionEmptyConstant(module: Module, expression: PsiExpression?): Boolean {
                 val reference = expression as? PsiReferenceExpression ?: return false
                 val field = reference.resolve() as? PsiField ?: return false
-                val mappedEmpty = field.findModule()?.getMappedField(EMPTY_SRG)?.name ?: "EMPTY"
-                return field.name == mappedEmpty && field.containingClass?.fullQualifiedName == STACK_FQ_NAME
+                val mappedEmpty = module.getMappedField(STACK_FQ_NAME, "EMPTY")
+                return field.name == mappedEmpty &&
+                    field.containingClass?.fullQualifiedName == module.getMappedClass(STACK_FQ_NAME)
             }
         }
-    }
-
-    private fun Module.getMappedMethod(reference: MemberReference): MemberReference? {
-        val srgManager = MinecraftFacet.getInstance(this, McpModuleType)?.srgManager
-        return srgManager?.srgMapNow?.mapToMcpMethod(reference)
-    }
-
-    private fun Module.getMappedField(reference: MemberReference): MemberReference? {
-        val srgManager = MinecraftFacet.getInstance(this, McpModuleType)?.srgManager
-        return srgManager?.srgMapNow?.mapToMcpField(reference)
     }
 }

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.at.completion
@@ -110,8 +120,8 @@ class AtCompletionContributor : CompletionContributor() {
                     kindResult.addElement(
                         PrioritizedLookupElement.withPriority(
                             LookupElementBuilder.create(name).withIcon(PlatformIcons.CLASS_ICON),
-                            1.0 + name.getValue(beginning)
-                        )
+                            1.0 + name.getValue(beginning),
+                        ),
                     )
                 }
             }
@@ -131,8 +141,8 @@ class AtCompletionContributor : CompletionContributor() {
                 result.addElement(
                     PrioritizedLookupElement.withPriority(
                         LookupElementBuilder.create(name).withIcon(PlatformIcons.CLASS_ICON),
-                        1.0
-                    )
+                        1.0,
+                    ),
                 )
             }
 
@@ -143,8 +153,8 @@ class AtCompletionContributor : CompletionContributor() {
                 result.addElement(
                     PrioritizedLookupElement.withPriority(
                         LookupElementBuilder.create(name).withIcon(PlatformIcons.CLASS_ICON),
-                        1.0
-                    )
+                        1.0,
+                    ),
                 )
             }
             return
@@ -171,8 +181,8 @@ class AtCompletionContributor : CompletionContributor() {
             result.addElement(
                 PrioritizedLookupElement.withPriority(
                     LookupElementBuilder.create(name).withIcon(PlatformIcons.CLASS_ICON),
-                    1.0
-                )
+                    1.0,
+                ),
             )
         }
         used.clear() // help GC
@@ -191,8 +201,8 @@ class AtCompletionContributor : CompletionContributor() {
             result.addElement(
                 PrioritizedLookupElement.withPriority(
                     LookupElementBuilder.create(name).withIcon(PlatformIcons.PACKAGE_ICON),
-                    0.0
-                )
+                    0.0,
+                ),
             )
         }
     }
@@ -211,7 +221,7 @@ class AtCompletionContributor : CompletionContributor() {
 
         val mcpModule = MinecraftFacet.getInstance(module)?.getModuleOfType(McpModuleType) ?: return
 
-        val srgMap = mcpModule.srgManager?.srgMapNow ?: return
+        val srgMap = mcpModule.mappingsManager?.mappingsNow ?: return
 
         val srgResult = result.withPrefixMatcher(SrgPrefixMatcher(text))
 
@@ -220,7 +230,7 @@ class AtCompletionContributor : CompletionContributor() {
                 continue
             }
 
-            val memberReference = srgMap.getSrgField(field) ?: field.simpleQualifiedMemberReference
+            val memberReference = srgMap.getIntermediaryField(field) ?: field.simpleQualifiedMemberReference
             srgResult.addElement(
                 PrioritizedLookupElement.withPriority(
                     LookupElementBuilder
@@ -232,8 +242,8 @@ class AtCompletionContributor : CompletionContributor() {
                             currentElement.replace(
                                 AtElementFactory.createFieldName(
                                     context.project,
-                                    memberReference.name
-                                )
+                                    memberReference.name,
+                                ),
                             )
 
                             // TODO: Fix visibility decrease
@@ -243,8 +253,8 @@ class AtCompletionContributor : CompletionContributor() {
                             context.document.insertString(context.editor.caretModel.offset, comment)
                             context.editor.caretModel.moveCaretRelatively(comment.length, 0, false, false, false)
                         },
-                    1.0
-                )
+                    1.0,
+                ),
             )
         }
 
@@ -253,7 +263,7 @@ class AtCompletionContributor : CompletionContributor() {
                 continue
             }
 
-            val memberReference = srgMap.getSrgMethod(method) ?: method.qualifiedMemberReference
+            val memberReference = srgMap.getIntermediaryMethod(method) ?: method.qualifiedMemberReference
             srgResult.addElement(
                 PrioritizedLookupElement.withPriority(
                     LookupElementBuilder.create(method.nameAndParameterTypes)
@@ -287,8 +297,8 @@ class AtCompletionContributor : CompletionContributor() {
                             currentElement.replace(
                                 AtElementFactory.createFunction(
                                     project,
-                                    memberReference.name + memberReference.descriptor
-                                )
+                                    memberReference.name + memberReference.descriptor,
+                                ),
                             )
 
                             // TODO: Fix visibility decreases
@@ -298,8 +308,8 @@ class AtCompletionContributor : CompletionContributor() {
                             context.document.insertString(context.editor.caretModel.offset, comment)
                             context.editor.caretModel.moveCaretRelatively(comment.length, 0, false, false, false)
                         },
-                    0.0
-                )
+                    0.0,
+                ),
             )
         }
     }

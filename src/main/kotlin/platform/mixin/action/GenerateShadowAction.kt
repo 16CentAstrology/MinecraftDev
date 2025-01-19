@@ -1,15 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.action
 
+import com.demonwav.mcdev.MinecraftProjectSettings
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants
 import com.demonwav.mcdev.platform.mixin.util.findFields
 import com.demonwav.mcdev.platform.mixin.util.findMethods
@@ -19,8 +30,8 @@ import com.demonwav.mcdev.util.findContainingClass
 import com.demonwav.mcdev.util.findFirstMember
 import com.demonwav.mcdev.util.findLastChild
 import com.demonwav.mcdev.util.findNextMember
+import com.demonwav.mcdev.util.generationInfoFromMethod
 import com.demonwav.mcdev.util.ifEmpty
-import com.demonwav.mcdev.util.realName
 import com.demonwav.mcdev.util.toTypedArray
 import com.intellij.application.options.CodeStyle
 import com.intellij.codeInsight.generation.GenerateMembersUtil
@@ -37,7 +48,6 @@ import com.intellij.lang.java.JavaLanguage
 import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.CommonClassNames
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClass
@@ -61,14 +71,14 @@ class GenerateShadowAction : MixinCodeInsightAction() {
             fieldNode.findOrConstructSourceField(
                 classNode,
                 project,
-                canDecompile = false
+                canDecompile = false,
             ).let(::PsiFieldMember)
         } ?: emptySequence()
         val methods = findMethods(psiClass, allowClinit = false)?.map { (classNode, fieldNode) ->
             fieldNode.findOrConstructSourceMethod(
                 classNode,
                 project,
-                canDecompile = false
+                canDecompile = false,
             ).let(::PsiMethodMember)
         } ?: emptySequence()
 
@@ -92,8 +102,8 @@ class GenerateShadowAction : MixinCodeInsightAction() {
                     createShadowMembers(
                         project,
                         psiClass,
-                        elements.asSequence().map(PsiElementClassMember<*>::getElement)
-                    )
+                        elements.asSequence().map(PsiElementClassMember<*>::getElement),
+                    ),
                     // Select first element in editor
                 ).firstOrNull()?.positionCaret(editor, false)
             }
@@ -120,7 +130,7 @@ fun insertShadows(psiClass: PsiClass, shadows: List<GenerationInfo>) {
 fun createShadowMembers(
     project: Project,
     psiClass: PsiClass,
-    members: Sequence<PsiMember>
+    members: Sequence<PsiMember>,
 ): List<PsiGenerationInfo<PsiMember>> {
     var methodAdded = false
 
@@ -136,17 +146,7 @@ fun createShadowMembers(
 
         // Add @Shadow annotation
         val annotation = shadowMember.modifierList!!.addAnnotation(MixinConstants.Annotations.SHADOW)
-        val realName = m.realName
-        if (realName != null && realName != m.name) {
-            val elementFactory = JavaPsiFacade.getElementFactory(project)
-            val value = elementFactory.createExpressionFromText(
-                "\"${StringUtil.escapeStringCharacters(realName)}\"",
-                annotation
-            )
-            annotation.setDeclaredAttributeValue("aliases", value)
-        }
-
-        PsiGenerationInfo(shadowMember)
+        generationInfoFromMethod(m, annotation, shadowMember)
     }.toList()
 
     // Make the class abstract (if not already)
@@ -237,6 +237,11 @@ private fun copyAnnotation(modifiers: PsiModifierList, newModifiers: PsiModifier
 }
 
 inline fun disableAnnotationWrapping(project: Project, func: () -> Unit) {
+    if (!MinecraftProjectSettings.getInstance(project).isShadowAnnotationsSameLine) {
+        func()
+        return
+    }
+
     val settings = CodeStyle.getSettings(project).getCommonSettings(JavaLanguage.INSTANCE)
     val methodWrap = settings.METHOD_ANNOTATION_WRAP
     val fieldWrap = settings.FIELD_ANNOTATION_WRAP

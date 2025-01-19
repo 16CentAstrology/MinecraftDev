@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.util
@@ -22,6 +32,7 @@ import com.demonwav.mcdev.util.findQualifiedClass
 import com.demonwav.mcdev.util.fullQualifiedName
 import com.demonwav.mcdev.util.hasSyntheticMethod
 import com.demonwav.mcdev.util.isErasureEquivalentTo
+import com.demonwav.mcdev.util.lockedCached
 import com.demonwav.mcdev.util.loggerForTopLevel
 import com.demonwav.mcdev.util.mapToArray
 import com.demonwav.mcdev.util.realName
@@ -32,6 +43,7 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.CompilerModuleExtension
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.RecursionManager
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.JavaRecursiveElementWalkingVisitor
@@ -57,18 +69,27 @@ import com.intellij.psi.PsiModifierList
 import com.intellij.psi.PsiParameter
 import com.intellij.psi.PsiParameterList
 import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 import com.intellij.psi.impl.compiled.ClsElementImpl
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.util.CachedValue
 import com.intellij.psi.util.PsiUtil
 import com.intellij.refactoring.util.LambdaRefactoringUtil
 import com.intellij.util.CommonJavaRefactoringUtil
+import com.llamalad7.mixinextras.expression.impl.utils.ExpressionASMUtils
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.Handle
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
 import org.objectweb.asm.signature.SignatureReader
+import org.objectweb.asm.tree.AbstractInsnNode
+import org.objectweb.asm.tree.AnnotationNode
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.FieldInsnNode
 import org.objectweb.asm.tree.FieldNode
@@ -78,6 +99,10 @@ import org.objectweb.asm.tree.InvokeDynamicInsnNode
 import org.objectweb.asm.tree.MethodInsnNode
 import org.objectweb.asm.tree.MethodNode
 import org.objectweb.asm.tree.VarInsnNode
+import org.objectweb.asm.util.Textifier
+import org.objectweb.asm.util.TraceAnnotationVisitor
+import org.objectweb.asm.util.TraceClassVisitor
+import org.objectweb.asm.util.TraceMethodVisitor
 
 private val LOGGER = loggerForTopLevel()
 
@@ -118,8 +143,25 @@ private fun hasModifier(access: Int, @PsiModifier.ModifierConstant modifier: Str
 }
 
 fun Type.toPsiType(elementFactory: PsiElementFactory, context: PsiElement? = null): PsiType {
-    return elementFactory.createTypeFromText(className.replace('$', '.'), context)
+    if (this == ExpressionASMUtils.INTLIKE_TYPE) {
+        return PsiTypes.intType()
+    }
+    return elementFactory.createTypeFromText(canonicalName, context)
 }
+
+val Type.canonicalName get() = computeCanonicalName(this)
+
+private val DOLLAR_TO_DOT_REGEX = "\\$(?!\\d)".toRegex()
+
+private fun computeCanonicalName(type: Type): String {
+    return when (type.sort) {
+        Type.ARRAY -> computeCanonicalName(type.elementType) + "[]".repeat(type.dimensions)
+        Type.OBJECT -> type.className.replace(DOLLAR_TO_DOT_REGEX, ".")
+        else -> type.className
+    }
+}
+
+val Type.isPrimitive get() = sort != Type.ARRAY && sort != Type.OBJECT && sort != Type.METHOD
 
 private fun hasAccess(access: Int, flag: Int) = (access and flag) != 0
 
@@ -140,13 +182,10 @@ private val LOAD_CLASS_FILE_BYTES: Method? = runCatching {
         .let { it.isAccessible = true; it }
 }.getOrNull()
 
+private val INNER_CLASS_NODES_KEY = Key.create<CachedValue<ConcurrentMap<String, ClassNode?>>>("mcdev.innerClassNodes")
+
 /**
  * Tries to find the bytecode for the class for the given qualified name.
- *
- * ### Implementation note:
- * First attempts to resolve the class using [findQualifiedClass]. This may fail in the case of anonymous classes, which
- * don't exist inside `PsiCompiledElement`s, so it then creates a fake `PsiClass` based on the qualified name and
- * attempts to resolve it from that.
  */
 fun findClassNodeByQualifiedName(project: Project, module: Module?, fqn: String): ClassNode? {
     val psiClass = findQualifiedClass(project, fqn)
@@ -154,47 +193,70 @@ fun findClassNodeByQualifiedName(project: Project, module: Module?, fqn: String)
         return findClassNodeByPsiClass(psiClass, module)
     }
 
-    // try to find it by a fake one
-    val fakeClassNode = ClassNode()
-    fakeClassNode.name = fqn.replace('.', '/')
-    val fakePsiClass = fakeClassNode.constructClass(project, "") ?: return null
-    return findClassNodeByPsiClass(fakePsiClass, module)
+    fun resolveViaFakeClass(): ClassNode? {
+        val fakeClassNode = ClassNode()
+        fakeClassNode.name = fqn.replace('.', '/')
+        val fakePsiClass = fakeClassNode.constructClass(project, "") ?: return null
+        return findClassNodeByPsiClass(fakePsiClass, module)
+    }
+
+    val outerClass = findQualifiedClass(project, fqn.substringBefore('$'))
+    if (outerClass != null) {
+        val innerClasses = outerClass.lockedCached(
+            INNER_CLASS_NODES_KEY,
+            compute = ::ConcurrentHashMap
+        )
+        return innerClasses.computeIfAbsent(fqn) { resolveViaFakeClass() }
+    }
+
+    return resolveViaFakeClass()
 }
 
+private val NODE_BY_PSI_CLASS_KEY = Key.create<CachedValue<ClassNode?>>("mcdev.nodeByPsiClass")
+
 fun findClassNodeByPsiClass(psiClass: PsiClass, module: Module? = psiClass.findModule()): ClassNode? {
-    return try {
-        val bytes = LOAD_CLASS_FILE_BYTES?.invoke(null, psiClass) as? ByteArray
-        if (bytes == null) {
-            // find compiler output
-            if (module == null) return null
-            val fqn = psiClass.fullQualifiedName ?: return null
-            var parentDir = CompilerModuleExtension.getInstance(module)?.compilerOutputPath ?: return null
-            val packageName = fqn.substringBeforeLast('.', "")
-            if (packageName.isNotEmpty()) {
-                for (dir in packageName.split('.')) {
-                    parentDir = parentDir.findChild(dir) ?: return null
+    return psiClass.lockedCached(NODE_BY_PSI_CLASS_KEY) {
+        try {
+            val bytes = LOAD_CLASS_FILE_BYTES?.invoke(null, psiClass) as? ByteArray
+            if (bytes == null) {
+                // find compiler output
+                if (module == null) return@lockedCached null
+                val fqn = psiClass.fullQualifiedName ?: return@lockedCached null
+                var parentDir = CompilerModuleExtension.getInstance(module)?.compilerOutputPath
+                    ?: return@lockedCached null
+                val packageName = fqn.substringBeforeLast('.', "")
+                if (packageName.isNotEmpty()) {
+                    for (dir in packageName.split('.')) {
+                        parentDir = parentDir.findChild(dir) ?: return@lockedCached null
+                    }
                 }
+                val classFile = parentDir.findChild("${fqn.substringAfterLast('.')}.class")
+                    ?: return@lockedCached null
+                val node = ClassNode()
+                classFile.inputStream.use { ClassReader(it).accept(node, 0) }
+                node
+            } else {
+                val node = ClassNode()
+                ClassReader(bytes).accept(node, 0)
+                node
             }
-            val classFile = parentDir.findChild("${fqn.substringAfterLast('.')}.class") ?: return null
-            val node = ClassNode()
-            classFile.inputStream.use { ClassReader(it).accept(node, 0) }
-            node
-        } else {
-            val node = ClassNode()
-            ClassReader(bytes).accept(node, 0)
-            node
+        } catch (e: Throwable) {
+            val actualThrowable = if (e is InvocationTargetException) e.cause ?: e else e
+            if (actualThrowable is ProcessCanceledException) {
+                throw actualThrowable
+            }
+
+            if (actualThrowable is NoSuchFileException) {
+                return@lockedCached null
+            }
+
+            val message = actualThrowable.message
+            // TODO: display an error to the user?
+            if (message == null || !message.contains("Unsupported class file major version")) {
+                LOGGER.error(actualThrowable)
+            }
+            null
         }
-    } catch (e: Throwable) {
-        val actualThrowable = if (e is InvocationTargetException) e.cause ?: e else e
-        if (actualThrowable is ProcessCanceledException) {
-            throw actualThrowable
-        }
-        val message = actualThrowable.message
-        // TODO: display an error to the user?
-        if (message == null || !message.contains("Unsupported class file major version")) {
-            LOGGER.error(actualThrowable)
-        }
-        null
     }
 }
 
@@ -269,7 +331,7 @@ private fun ClassNode.constructClass(project: Project, body: String): PsiClass? 
     val file = PsiFileFactory.getInstance(project).createFileFromText(
         "$outerClassSimpleName.java",
         JavaFileType.INSTANCE,
-        text
+        text,
     ) as? PsiJavaFile ?: return null
 
     var clazz = file.classes.firstOrNull() ?: return null
@@ -278,7 +340,7 @@ private fun ClassNode.constructClass(project: Project, body: String): PsiClass? 
     (
         JavaPsiFacade.getInstance(project).findClass(
             outerClassName.replace('/', '.'),
-            GlobalSearchScope.allScope(project)
+            GlobalSearchScope.allScope(project),
         ) as? PsiCompiledElement
         )?.let { originalClass ->
         clazz.putUserData(ClsElementImpl.COMPILED_ELEMENT, originalClass)
@@ -308,8 +370,11 @@ private fun ClassNode.constructClass(project: Project, body: String): PsiClass? 
     return clazz
 }
 
-inline fun <T> ClassNode.cached(project: Project, vararg dependencies: Any, crossinline compute: () -> T): T {
-    return findStubClass(project)?.cached(*dependencies, compute = compute) ?: compute()
+fun <T> ClassNode.cached(project: Project, vararg dependencies: Any, compute: (ClassNode) -> T): T {
+    val unsafeClass = UnsafeCachedValueCapture(this)
+    return findStubClass(project)?.cached(*dependencies) {
+        compute(unsafeClass.value)
+    } ?: compute(this)
 }
 
 /**
@@ -426,7 +491,7 @@ val FieldNode.memberReference
 
 fun FieldNode.getGenericType(
     clazz: ClassNode,
-    project: Project
+    project: Project,
 ): PsiType {
     if (this.signature != null) {
         return findOrConstructSourceField(clazz, project, canDecompile = false).type
@@ -435,13 +500,17 @@ fun FieldNode.getGenericType(
     return Type.getType(this.desc).toPsiType(elementFactory)
 }
 
-inline fun <T> FieldNode.cached(
+fun <T> FieldNode.cached(
     clazz: ClassNode,
     project: Project,
     vararg dependencies: Any,
-    crossinline compute: () -> T
+    compute: (ClassNode, FieldNode) -> T,
 ): T {
-    return findStubField(clazz, project)?.cached(*dependencies, compute = compute) ?: compute()
+    val unsafeClass = UnsafeCachedValueCapture(clazz)
+    val unsafeField = UnsafeCachedValueCapture(this)
+    return findStubField(clazz, project)?.cached(*dependencies) {
+        compute(unsafeClass.value, unsafeField.value)
+    } ?: compute(clazz, this)
 }
 
 fun FieldNode.findStubField(clazz: ClassNode, project: Project): PsiField? {
@@ -457,7 +526,7 @@ fun FieldNode.findOrConstructSourceField(
     clazz: ClassNode?,
     project: Project,
     scope: GlobalSearchScope = GlobalSearchScope.allScope(project),
-    canDecompile: Boolean = false
+    canDecompile: Boolean = false,
 ): PsiField {
     clazz?.let { findSourceField(it, project, scope, canDecompile = canDecompile) }?.let { return it }
 
@@ -475,7 +544,7 @@ fun FieldNode.findOrConstructSourceField(
     }
     val psiField = elementFactory.createField(
         this.name.toJavaIdentifier(),
-        type
+        type,
     )
     psiField.realName = this.name
     val modifierList = psiField.modifierList!!
@@ -496,7 +565,7 @@ fun FieldNode.findSourceField(
     clazz: ClassNode,
     project: Project,
     scope: GlobalSearchScope,
-    canDecompile: Boolean = false
+    canDecompile: Boolean = false,
 ): PsiField? {
     return clazz.findSourceClass(project, scope, canDecompile)?.findField(memberReference)
 }
@@ -566,6 +635,31 @@ val MethodNode.isConstructor
 val MethodNode.isClinit
     get() = this.name == "<clinit>"
 
+/**
+ * Finds the super() call in this method node, assuming it is a constructor
+ */
+fun MethodNode.findSuperConstructorCall(): AbstractInsnNode? {
+    val insns = instructions ?: return null
+    var superCtorCall = insns.first
+    var newCount = 0
+    while (superCtorCall != null) {
+        if (superCtorCall.opcode == Opcodes.NEW) {
+            newCount++
+        } else if (superCtorCall.opcode == Opcodes.INVOKESPECIAL) {
+            val methodCall = superCtorCall as MethodInsnNode
+            if (methodCall.name == "<init>") {
+                if (newCount == 0) {
+                    return superCtorCall
+                } else {
+                    newCount--
+                }
+            }
+        }
+        superCtorCall = superCtorCall.next
+    }
+    return null
+}
+
 private fun findContainingMethod(clazz: ClassNode, lambdaMethod: MethodNode): Pair<MethodNode, Int>? {
     if (!lambdaMethod.hasAccess(Opcodes.ACC_SYNTHETIC)) {
         return null
@@ -618,15 +712,15 @@ private fun findAssociatedLambda(psiClass: PsiClass, clazz: ClassNode, lambdaMet
         var result: PsiElement? = null
         parent.accept(
             object : JavaRecursiveElementWalkingVisitor() {
-                override fun visitAnonymousClass(aClass: PsiAnonymousClass?) {
+                override fun visitAnonymousClass(aClass: PsiAnonymousClass) {
                     // skip anonymous classes
                 }
 
-                override fun visitClass(aClass: PsiClass?) {
+                override fun visitClass(aClass: PsiClass) {
                     // skip inner classes
                 }
 
-                override fun visitLambdaExpression(expression: PsiLambdaExpression?) {
+                override fun visitLambdaExpression(expression: PsiLambdaExpression) {
                     if (i++ == index) {
                         result = expression
                         stopWalking()
@@ -645,19 +739,23 @@ private fun findAssociatedLambda(psiClass: PsiClass, clazz: ClassNode, lambdaMet
                         }
                     }
                 }
-            }
+            },
         )
         result
     }
 }
 
-inline fun <T> MethodNode.cached(
+fun <T> MethodNode.cached(
     clazz: ClassNode,
     project: Project,
     vararg dependencies: Array<Any>,
-    crossinline compute: () -> T
+    compute: (ClassNode, MethodNode) -> T,
 ): T {
-    return findStubMethod(clazz, project)?.cached(*dependencies, compute = compute) ?: compute()
+    val unsafeClass = UnsafeCachedValueCapture(clazz)
+    val unsafeMethod = UnsafeCachedValueCapture(this)
+    return findStubMethod(clazz, project)?.cached(*dependencies) {
+        compute(unsafeClass.value, unsafeMethod.value)
+    } ?: compute(clazz, this)
 }
 
 fun MethodNode.findStubMethod(clazz: ClassNode, project: Project): PsiMethod? {
@@ -691,7 +789,7 @@ fun MethodNode.findOrConstructSourceMethod(
     clazz: ClassNode?,
     project: Project,
     scope: GlobalSearchScope = GlobalSearchScope.allScope(project),
-    canDecompile: Boolean = false
+    canDecompile: Boolean = false,
 ): PsiMethod {
     val sourceElement = clazz?.let { findSourceElement(it, project, scope, canDecompile = canDecompile) }
     if (sourceElement is PsiMethod) {
@@ -709,7 +807,7 @@ fun MethodNode.findOrConstructSourceMethod(
             val simpleName = clazz?.name?.substringAfterLast('/')
             if (simpleName != null) {
                 name = simpleName.substringAfterLast('$')
-                while (!name[0].isJavaIdentifierStart()) {
+                while (name.isNotEmpty() && !name[0].isJavaIdentifierStart()) {
                     val dollarIndex = simpleName.lastIndexOf('$', simpleName.length - name.length - 2)
                     if (dollarIndex == -1) {
                         name = simpleName
@@ -720,7 +818,7 @@ fun MethodNode.findOrConstructSourceMethod(
             }
             append(name)
         } else {
-            append(returnType.className.replace('$', '.'))
+            append(returnType.canonicalName)
             append(' ')
             append(this@findOrConstructSourceMethod.name.toJavaIdentifier())
         }
@@ -730,7 +828,7 @@ fun MethodNode.findOrConstructSourceMethod(
             if (index != 0) {
                 append(", ")
             }
-            var typeName = param.className.replace('$', '.')
+            var typeName = param.canonicalName
             if (index == params.size - 1 && hasAccess(Opcodes.ACC_VARARGS) && typeName.endsWith("[]")) {
                 typeName = typeName.replaceRange(typeName.length - 2, typeName.length, "...")
             }
@@ -825,8 +923,8 @@ fun MethodNode.findOrConstructSourceMethod(
     if (exceptions != null) {
         psiMethod.throwsList.replace(
             elementFactory.createReferenceList(
-                exceptions.mapToArray { elementFactory.createReferenceFromText(it.replace('/', '.'), null) }
-            )
+                exceptions.mapToArray { elementFactory.createReferenceFromText(it.replace('/', '.'), null) },
+            ),
         )
     }
 
@@ -856,7 +954,7 @@ fun MethodNode.findSourceElement(
     clazz: ClassNode,
     project: Project,
     scope: GlobalSearchScope,
-    canDecompile: Boolean = false
+    canDecompile: Boolean = false,
 ): PsiElement? {
     val psiClass = clazz.findSourceClass(project, scope, canDecompile) ?: return null
     if (isClinit) {
@@ -889,4 +987,44 @@ fun MethodInsnNode.fakeResolve(): ClassAndMethodNode {
     clazz.methods = mutableListOf(method)
     addConstructorToFakeClass(clazz)
     return ClassAndMethodNode(clazz, method)
+}
+
+// Textifier
+
+fun ClassNode.textify(): String {
+    val sw = StringWriter()
+    accept(TraceClassVisitor(PrintWriter(sw)))
+    return sw.toString().replaceIndent().trimEnd()
+}
+
+fun FieldNode.textify(): String {
+    val cv = TraceClassVisitor(null)
+    accept(cv)
+    val sw = StringWriter()
+    cv.p.print(PrintWriter(sw))
+    return sw.toString().replaceIndent().trimEnd()
+}
+
+fun MethodNode.textify(): String {
+    val cv = TraceClassVisitor(null)
+    accept(cv)
+    val sw = StringWriter()
+    cv.p.print(PrintWriter(sw))
+    return sw.toString().replaceIndent().trimEnd()
+}
+
+fun AnnotationNode.textify(): String {
+    val textifier = Textifier()
+    accept(TraceAnnotationVisitor(textifier))
+    val sw = StringWriter()
+    textifier.print(PrintWriter(sw))
+    return sw.toString().replaceIndent().trimEnd()
+}
+
+fun AbstractInsnNode.textify(): String {
+    val mv = TraceMethodVisitor(Textifier())
+    accept(mv)
+    val sw = StringWriter()
+    mv.p.print(PrintWriter(sw))
+    return sw.toString().replaceIndent().trimEnd()
 }

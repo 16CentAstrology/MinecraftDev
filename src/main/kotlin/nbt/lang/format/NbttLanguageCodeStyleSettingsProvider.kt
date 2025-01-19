@@ -1,16 +1,28 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.nbt.lang.format
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.nbt.lang.NbttLanguage
+import com.intellij.CodeStyleBundle
 import com.intellij.application.options.IndentOptionsEditor
 import com.intellij.application.options.SmartIndentOptionsEditor
 import com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable
@@ -32,15 +44,15 @@ class NbttLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvider(
                     "Wrap list items",
                     CodeStyleSettingsCustomizableOptions.getInstance().WRAPPING_BRACES,
                     arrayOf(
-                        "Do not wrap",
-                        "Wrap as needed",
-                        "Wrap always",
+                        CodeStyleBundle.message("wrapping.do.not.wrap"),
+                        CodeStyleBundle.message("wrapping.wrap.if.long"),
+                        CodeStyleBundle.message("wrapping.wrap.always"),
                     ),
                     intArrayOf(
                         CommonCodeStyleSettings.DO_NOT_WRAP,
                         CommonCodeStyleSettings.WRAP_AS_NEEDED,
                         CommonCodeStyleSettings.WRAP_ALWAYS,
-                    )
+                    ),
                 )
                 consumer.showCustomOption(
                     NbttCodeStyleSettings::class.java,
@@ -48,15 +60,15 @@ class NbttLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvider(
                     "Wrap array items",
                     CodeStyleSettingsCustomizableOptions.getInstance().WRAPPING_BRACES,
                     arrayOf(
-                        "Do not wrap",
-                        "Wrap as needed",
-                        "Wrap always",
+                        CodeStyleBundle.message("wrapping.do.not.wrap"),
+                        CodeStyleBundle.message("wrapping.wrap.if.long"),
+                        CodeStyleBundle.message("wrapping.wrap.always"),
                     ),
                     intArrayOf(
                         CommonCodeStyleSettings.DO_NOT_WRAP,
                         CommonCodeStyleSettings.WRAP_AS_NEEDED,
                         CommonCodeStyleSettings.WRAP_ALWAYS,
-                    )
+                    ),
                 )
             }
 
@@ -65,23 +77,25 @@ class NbttLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvider(
                     "SPACE_WITHIN_BRACKETS",
                     "SPACE_WITHIN_PARENTHESES",
                     "SPACE_BEFORE_COMMA",
-                    "SPACE_AFTER_COMMA"
+                    "SPACE_AFTER_COMMA",
                 )
                 consumer.showCustomOption(
                     NbttCodeStyleSettings::class.java,
                     "SPACE_BEFORE_COLON",
-                    "Space before colon",
-                    CodeStyleSettingsCustomizableOptions.getInstance().SPACES_AROUND_OPERATORS
+                    MCDevBundle("nbt.lang.style.space_before_colon"),
+                    CodeStyleSettingsCustomizableOptions.getInstance().SPACES_AROUND_OPERATORS,
                 )
                 consumer.showCustomOption(
                     NbttCodeStyleSettings::class.java,
                     "SPACE_AFTER_COLON",
-                    "Space after colon",
-                    CodeStyleSettingsCustomizableOptions.getInstance().SPACES_AROUND_OPERATORS
+                    MCDevBundle("nbt.lang.style.space_after_colon"),
+                    CodeStyleSettingsCustomizableOptions.getInstance().SPACES_AROUND_OPERATORS,
                 )
 
-                consumer.renameStandardOption("SPACE_WITHIN_BRACKETS", "List brackets")
-                consumer.renameStandardOption("SPACE_WITHIN_PARENTHESES", "Array parentheses")
+                val listBracket = MCDevBundle("nbt.lang.style.list_brackets")
+                consumer.renameStandardOption("SPACE_WITHIN_BRACKETS", listBracket)
+                val arrayParen = MCDevBundle("nbt.lang.style.array_parentheses")
+                consumer.renameStandardOption("SPACE_WITHIN_PARENTHESES", arrayParen)
             }
 
             else -> {
@@ -95,7 +109,7 @@ class NbttLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvider(
 
     override fun customizeDefaults(
         commonSettings: CommonCodeStyleSettings,
-        indentOptions: CommonCodeStyleSettings.IndentOptions
+        indentOptions: CommonCodeStyleSettings.IndentOptions,
     ) {
         commonSettings.RIGHT_MARGIN = 150
         indentOptions.USE_TAB_CHARACTER = true

@@ -1,22 +1,33 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.gradle.tooling.fabricloom
 
-
 import org.gradle.api.Project
 import org.jetbrains.annotations.NotNull
+import org.jetbrains.plugins.gradle.tooling.AbstractModelBuilderService
 import org.jetbrains.plugins.gradle.tooling.ErrorMessageBuilder
-import org.jetbrains.plugins.gradle.tooling.ModelBuilderService
+import org.jetbrains.plugins.gradle.tooling.Message
+import org.jetbrains.plugins.gradle.tooling.ModelBuilderContext
 
-class FabricLoomModelBuilderImpl implements ModelBuilderService {
+class FabricLoomModelBuilderImpl extends AbstractModelBuilderService {
 
     @Override
     boolean canBuild(String modelName) {
@@ -24,7 +35,7 @@ class FabricLoomModelBuilderImpl implements ModelBuilderService {
     }
 
     @Override
-    Object buildAll(String modelName, Project project) {
+    Object buildAll(@NotNull String modelName, @NotNull Project project, @NotNull ModelBuilderContext context) {
         if (!project.plugins.hasPlugin('fabric-loom')) {
             return null
         }
@@ -33,13 +44,23 @@ class FabricLoomModelBuilderImpl implements ModelBuilderService {
 
         try {
             return build(project, loomExtension)
-        } catch (GroovyRuntimeException ignored) {
+        } catch (GroovyRuntimeException ex) {
+            context.messageReporter.createMessage()
+                    .withTitle("Minecraft Dev - Loom importing error")
+                    .withText("An error occurred while importing Loom data, falling back to legacy import")
+                    .withGroup("com.demonwav.mcdev")
+                    .withKind(Message.Kind.WARNING)
+                    .withStackTrace()
+                    .withException(ex)
+                    .reportMessage(project)
+
             // Must be using an older loom version, fallback.
             return buildLegacy(project, loomExtension)
         }
     }
 
     FabricLoomModel build(Project project, Object loomExtension) {
+        def minecraftVersion = loomExtension.minecraftProvider.minecraftVersion()
         def tinyMappings = loomExtension.mappingsFile
         def splitMinecraftJar = loomExtension.areEnvironmentSourceSetsSplit()
 
@@ -52,14 +73,27 @@ class FabricLoomModelBuilderImpl implements ModelBuilderService {
             decompilers << ["single": getDecompilers(loomExtension, false)]
         }
 
+        def modSourceSets = [:]
+
+        for (def mod in loomExtension.getMods()) {
+            def modName = mod.getName()
+            modSourceSets[modName] = mod.getModSourceSets().getOrNull()?.collect { it.sourceSet().getName() }
+        }
+
         //noinspection GroovyAssignabilityCheck
-        return new FabricLoomModelImpl(tinyMappings, decompilers, splitMinecraftJar)
+        return new FabricLoomModelImpl(minecraftVersion, tinyMappings, decompilers, splitMinecraftJar, modSourceSets)
     }
 
     List<FabricLoomModelImpl.DecompilerModelImpl> getDecompilers(Object loomExtension, boolean client) {
         loomExtension.decompilerOptions.collect {
             def task = loomExtension.getDecompileTask(it, client)
-            def sourcesPath = task.outputJar.get().getAsFile().getAbsolutePath()
+            def sourcesPath
+            if (task.hasProperty("outputJar")) {
+                // Pre 1.8
+                sourcesPath = task.outputJar.get().getAsFile().getAbsolutePath()
+            } else {
+                sourcesPath = task.sourcesOutputJar.get().getAsFile().getAbsolutePath()
+            }
             new FabricLoomModelImpl.DecompilerModelImpl(name: it.name, taskName: task.name, sourcesPath: sourcesPath)
         }
     }
@@ -73,7 +107,7 @@ class FabricLoomModelBuilderImpl implements ModelBuilderService {
         }
 
         //noinspection GroovyAssignabilityCheck
-        return new FabricLoomModelImpl(tinyMappings, ["single": decompilers], false)
+        return new FabricLoomModelImpl(tinyMappings, ["single": decompilers], false, [:])
     }
 
     @Override

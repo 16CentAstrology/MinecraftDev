@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.forge.inspections.sideonly
@@ -26,7 +36,7 @@ class NestedClassSideOnlyInspection : BaseInspection() {
         "A nested class cannot declare a side that is different from the parent class." +
             "\nEither remove the nested class's @SideOnly annotation, or change it to match it's parent's side."
 
-    override fun getStaticDescription(): String? {
+    override fun getStaticDescription(): String {
         return "Classes which are annotated with @SideOnly cannot contain any nested classes which are " +
             "annotated with a different @SideOnly annotation. Since a class that is annotated with @SideOnly " +
             "brings everything with it, @SideOnly annotated nested classes are usually useless."
@@ -36,7 +46,10 @@ class NestedClassSideOnlyInspection : BaseInspection() {
         val annotation = infos[0] as PsiAnnotation
 
         return if (annotation.isWritable) {
-            RemoveAnnotationInspectionGadgetsFix(annotation, "Remove @SideOnly annotation from nested class")
+            RemoveAnnotationInspectionGadgetsFix(
+                annotation.qualifiedName ?: return null,
+                "Remove @SideOnly annotation from nested class"
+            )
         } else {
             null
         }

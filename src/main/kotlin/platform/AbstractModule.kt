@@ -1,17 +1,27 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform
 
 import com.demonwav.mcdev.facet.MinecraftFacet
-import com.demonwav.mcdev.insight.generation.GenerationData
+import com.demonwav.mcdev.insight.generation.EventListenerGenerationSupport
 import com.demonwav.mcdev.inspection.IsCancelled
 import com.intellij.openapi.module.Module
 import com.intellij.psi.PsiClass
@@ -34,6 +44,8 @@ abstract class AbstractModule(protected val facet: MinecraftFacet) {
     open val icon: Icon?
         get() = moduleType.icon
 
+    open val eventListenerGenSupport: EventListenerGenerationSupport? = null
+
     /**
      * By default, this method is provided in the case that a specific platform has no
      * listener handling whatsoever, or simply accepts event listeners with random
@@ -52,15 +64,6 @@ abstract class AbstractModule(protected val facet: MinecraftFacet) {
 
     open fun writeErrorMessageForEventParameter(eventClass: PsiClass, method: PsiMethod) =
         "Parameter does not extend the proper Event Class!"
-
-    open fun doPreEventGenerate(psiClass: PsiClass, data: GenerationData?) {}
-
-    open fun generateEventListenerMethod(
-        containingClass: PsiClass,
-        chosenClass: PsiClass,
-        chosenName: String,
-        data: GenerationData?
-    ): PsiMethod? = null
 
     open fun shouldShowPluginIcon(element: PsiElement?) = false
 
@@ -83,4 +86,5 @@ abstract class AbstractModule(protected val facet: MinecraftFacet) {
 
     open fun init() {}
     open fun dispose() {}
+    open fun refresh() {}
 }

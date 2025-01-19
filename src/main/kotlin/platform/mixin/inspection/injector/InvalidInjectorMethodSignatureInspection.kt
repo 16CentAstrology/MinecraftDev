@@ -1,50 +1,83 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.inspection.injector
 
-import com.demonwav.mcdev.platform.mixin.handlers.InjectAnnotationHandler
 import com.demonwav.mcdev.platform.mixin.handlers.InjectorAnnotationHandler
 import com.demonwav.mcdev.platform.mixin.handlers.MixinAnnotationHandler
 import com.demonwav.mcdev.platform.mixin.inspection.MixinInspection
 import com.demonwav.mcdev.platform.mixin.reference.MethodReference
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.COERCE
+import com.demonwav.mcdev.platform.mixin.util.findSuperConstructorCall
 import com.demonwav.mcdev.platform.mixin.util.hasAccess
 import com.demonwav.mcdev.platform.mixin.util.isAssignable
 import com.demonwav.mcdev.platform.mixin.util.isConstructor
+import com.demonwav.mcdev.platform.mixin.util.isMixinExtrasSugar
 import com.demonwav.mcdev.util.Parameter
+import com.demonwav.mcdev.util.findKeyword
 import com.demonwav.mcdev.util.fullQualifiedName
+import com.demonwav.mcdev.util.invokeLater
 import com.demonwav.mcdev.util.synchronize
+import com.intellij.codeInsight.FileModificationService
+import com.intellij.codeInsight.intention.FileModifier.SafeFieldForPreview
 import com.intellij.codeInsight.intention.QuickFixFactory
-import com.intellij.codeInspection.LocalQuickFix
-import com.intellij.codeInspection.ProblemDescriptor
+import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
+import com.intellij.codeInsight.lookup.LookupElement
+import com.intellij.codeInsight.lookup.LookupElementBuilder
+import com.intellij.codeInsight.template.Expression
+import com.intellij.codeInsight.template.ExpressionContext
+import com.intellij.codeInsight.template.Template
+import com.intellij.codeInsight.template.TemplateBuilderImpl
+import com.intellij.codeInsight.template.TemplateManager
+import com.intellij.codeInsight.template.TextResult
+import com.intellij.codeInsight.template.impl.VariableNode
+import com.intellij.codeInspection.LocalQuickFixAndIntentionActionOnPsiElement
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.openapi.application.runWriteAction
+import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.TextRange
 import com.intellij.psi.JavaElementVisitor
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClassType
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
+import com.intellij.psi.PsiEllipsisType
+import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiModifier
+import com.intellij.psi.PsiNameHelper
 import com.intellij.psi.PsiParameterList
 import com.intellij.psi.PsiPrimitiveType
 import com.intellij.psi.PsiType
 import com.intellij.psi.codeStyle.JavaCodeStyleManager
 import com.intellij.psi.codeStyle.VariableKind
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.PsiUtil
 import com.intellij.psi.util.TypeConversionUtil
+import com.intellij.psi.util.parentOfType
+import com.intellij.refactoring.suggested.startOffset
 import org.objectweb.asm.Opcodes
-import org.objectweb.asm.tree.AbstractInsnNode
-import org.objectweb.asm.tree.InsnList
-import org.objectweb.asm.tree.MethodInsnNode
 
 class InvalidInjectorMethodSignatureInspection : MixinInspection() {
 
@@ -74,12 +107,13 @@ class InvalidInjectorMethodSignatureInspection : MixinInspection() {
 
                         if (!shouldBeStatic && targetMethod.method.isConstructor) {
                             // before the superclass constructor call, everything must be static
-                            targetMethod.method.instructions?.let { methodInsns ->
-                                val superCtorCall = findSuperConstructorCall(methodInsns)
+                            val methodInsns = targetMethod.method.instructions
+                            val superCtorCall = targetMethod.method.findSuperConstructorCall()
+                            if (methodInsns != null && superCtorCall != null) {
                                 val insns = handler.resolveInstructions(
                                     annotation,
                                     targetMethod.clazz,
-                                    targetMethod.method
+                                    targetMethod.method,
                                 )
                                 shouldBeStatic = insns.any {
                                     methodInsns.indexOf(it.insn) <= methodInsns.indexOf(superCtorCall)
@@ -96,8 +130,20 @@ class InvalidInjectorMethodSignatureInspection : MixinInspection() {
                                     modifiers,
                                     PsiModifier.STATIC,
                                     true,
-                                    false
-                                )
+                                    false,
+                                ),
+                            )
+                        } else if (!shouldBeStatic && modifiers.hasModifierProperty(PsiModifier.STATIC)) {
+                            reportedStatic = true
+                            holder.registerProblem(
+                                modifiers.findKeyword(PsiModifier.STATIC) ?: identifier,
+                                "Method must not be static",
+                                QuickFixFactory.getInstance().createModifierListFix(
+                                    modifiers,
+                                    PsiModifier.STATIC,
+                                    false,
+                                    false,
+                                ),
                             )
                         }
                     }
@@ -108,17 +154,19 @@ class InvalidInjectorMethodSignatureInspection : MixinInspection() {
                         val possibleSignatures = handler.expectedMethodSignature(
                             annotation,
                             targetMethod.clazz,
-                            targetMethod.method
+                            targetMethod.method,
                         ) ?: continue
 
                         val annotationName = annotation.nameReferenceElement?.referenceName
 
                         if (possibleSignatures.isEmpty()) {
                             reportedSignature = true
-                            holder.registerProblem(
-                                parameters,
-                                "There are no possible signatures for this injector"
-                            )
+                            if (handler.isUnresolved(annotation) != null) {
+                                holder.registerProblem(
+                                    parameters,
+                                    "There are no possible signatures for this injector",
+                                )
+                            }
                             continue
                         }
 
@@ -138,79 +186,55 @@ class InvalidInjectorMethodSignatureInspection : MixinInspection() {
                         }
 
                         if (!isValid) {
-                            val (expectedParameters, expectedReturnType) = possibleSignatures[0]
+                            val (expectedParameters, expectedReturnType, intLikeTypePositions) = possibleSignatures[0]
+                            val normalizedReturnType = when (expectedReturnType) {
+                                is PsiEllipsisType -> expectedReturnType.toArrayType()
+                                else -> expectedReturnType
+                            }
 
-                            val checkResult = checkParameters(parameters, expectedParameters, handler.allowCoerce)
-                            if (checkResult != CheckResult.OK) {
+                            val paramsCheck = checkParameters(parameters, expectedParameters, handler.allowCoerce)
+                            val isWarning = paramsCheck == CheckResult.WARNING
+                            val methodReturnType = method.returnType
+                            val returnTypeOk = methodReturnType != null &&
+                                checkReturnType(normalizedReturnType, methodReturnType, method, handler.allowCoerce)
+                            val isError = paramsCheck == CheckResult.ERROR || !returnTypeOk
+                            if (isWarning || isError) {
                                 reportedSignature = true
 
                                 val description =
-                                    "Method parameters do not match expected parameters for $annotationName"
-                                val quickFix = ParametersQuickFix(
-                                    expectedParameters,
-                                    handler is InjectAnnotationHandler
+                                    "Method signature does not match expected signature for $annotationName"
+                                val quickFix = SignatureQuickFix(
+                                    method,
+                                    expectedParameters.takeUnless { paramsCheck == CheckResult.OK },
+                                    normalizedReturnType.takeUnless { returnTypeOk },
+                                    intLikeTypePositions
                                 )
-                                if (checkResult == CheckResult.ERROR) {
-                                    holder.registerProblem(parameters, description, quickFix)
-                                } else {
-                                    holder.registerProblem(
-                                        parameters,
-                                        description,
-                                        ProblemHighlightType.WARNING,
-                                        quickFix
-                                    )
-                                }
-                            }
-
-                            val methodReturnType = method.returnType
-                            if (methodReturnType == null ||
-                                !checkReturnType(expectedReturnType, methodReturnType, method, handler.allowCoerce)
-                            ) {
-                                reportedSignature = true
-
+                                val highlightType =
+                                    if (isError)
+                                        ProblemHighlightType.GENERIC_ERROR_OR_WARNING
+                                    else
+                                        ProblemHighlightType.WARNING
+                                val declarationStart = (method.returnTypeElement ?: identifier).startOffsetInParent
+                                val declarationEnd = method.parameterList.textRangeInParent.endOffset
                                 holder.registerProblem(
-                                    method.returnTypeElement ?: identifier,
-                                    "Expected return type '${expectedReturnType.presentableText}' " +
-                                        "for $annotationName method",
-                                    QuickFixFactory.getInstance().createMethodReturnFix(
-                                        method,
-                                        expectedReturnType,
-                                        false
-                                    )
+                                    method,
+                                    description,
+                                    highlightType,
+                                    TextRange.create(declarationStart, declarationEnd),
+                                    quickFix
                                 )
                             }
                         }
                     }
                 }
             }
-        }
-
-        private fun findSuperConstructorCall(methodInsns: InsnList): AbstractInsnNode? {
-            var superCtorCall = methodInsns.first
-            var newCount = 0
-            while (superCtorCall != null) {
-                if (superCtorCall.opcode == Opcodes.NEW) {
-                    newCount++
-                } else if (superCtorCall.opcode == Opcodes.INVOKESPECIAL) {
-                    val methodCall = superCtorCall as MethodInsnNode
-                    if (methodCall.name == "<init>") {
-                        if (newCount == 0) {
-                            return superCtorCall
-                        } else {
-                            newCount--
-                        }
-                    }
-                }
-                superCtorCall = superCtorCall.next
-            }
-            return null
         }
 
         private fun checkReturnType(
             expectedReturnType: PsiType,
             methodReturnType: PsiType,
             method: PsiMethod,
-            allowCoerce: Boolean
+            allowCoerce: Boolean,
         ): Boolean {
             val expectedErasure = TypeConversionUtil.erasure(expectedReturnType)
             val returnErasure = TypeConversionUtil.erasure(methodReturnType)
@@ -229,14 +253,15 @@ class InvalidInjectorMethodSignatureInspection : MixinInspection() {
         private fun checkParameters(
             parameterList: PsiParameterList,
             expected: List<ParameterGroup>,
-            allowCoerce: Boolean
+            allowCoerce: Boolean,
         ): CheckResult {
             val parameters = parameterList.parameters
+            val parametersWithoutSugar = parameters.dropLastWhile { it.isMixinExtrasSugar }.toTypedArray()
             var pos = 0
 
             for (group in expected) {
                 // Check if parameter group matches
-                if (group.match(parameters, pos, allowCoerce)) {
+                if (group.match(parametersWithoutSugar, pos, allowCoerce)) {
                     pos += group.size
                 } else if (group.required != ParameterGroup.RequiredLevel.OPTIONAL) {
                     return if (group.required == ParameterGroup.RequiredLevel.ERROR_IF_ABSENT) {
@@ -244,6 +269,15 @@ class InvalidInjectorMethodSignatureInspection : MixinInspection() {
                     } else {
                         CheckResult.WARNING
                     }
+                }
+            }
+
+            // Sugars are valid on any injector and should be ignored, as long as they're at the end.
+            while (pos < parameters.size) {
+                if (parameters[pos].isMixinExtrasSugar) {
+                    pos++
+                } else {
+                    break
                 }
             }
 
@@ -267,44 +301,171 @@ class InvalidInjectorMethodSignatureInspection : MixinInspection() {
         OK, WARNING, ERROR
     }
 
-    private class ParametersQuickFix(
-        private val expected: List<ParameterGroup>,
-        isInject: Boolean
-    ) : LocalQuickFix {
+    private class SignatureQuickFix(
+        method: PsiMethod,
+        @SafeFieldForPreview
+        private val expectedParams: List<ParameterGroup>?,
+        @SafeFieldForPreview
+        private val expectedReturnType: PsiType?,
+        private val intLikeTypePositions: List<MethodSignature.TypePosition>
+    ) : LocalQuickFixAndIntentionActionOnPsiElement(method) {
 
-        private val fixName = if (isInject) {
-            "Fix method parameters"
-        } else {
-            "Fix method parameters (won't keep captured locals)"
-        }
+        private val fixName = "Fix method signature"
 
         override fun getFamilyName() = fixName
 
-        override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
-            val parameters = descriptor.psiElement as PsiParameterList
+        override fun getText() = familyName
+
+        override fun startInWriteAction() = false
+
+        override fun invoke(
+            project: Project,
+            file: PsiFile,
+            editor: Editor?,
+            startElement: PsiElement,
+            endElement: PsiElement,
+        ) {
+            if (!FileModificationService.getInstance().preparePsiElementForWrite(startElement)) {
+                return
+            }
+            val method = startElement as PsiMethod
+            fixParameters(project, method.parameterList, false)
+            fixReturnType(method, editor ?: return, file, false)
+            fixIntLikeTypes(method, editor, false)
+        }
+
+        override fun generatePreview(project: Project, editor: Editor, file: PsiFile): IntentionPreviewInfo {
+            val method = PsiTreeUtil.findSameElementInCopy(startElement, file) as? PsiMethod
+                ?: return IntentionPreviewInfo.EMPTY
+            fixParameters(project, method.parameterList, true)
+            // Pass the original startElement because the underlying fix gets the preview element itself
+            fixReturnType(startElement as PsiMethod, editor, file, true)
+            fixIntLikeTypes(method, editor, true)
+            return IntentionPreviewInfo.DIFF
+        }
+
+        private fun fixParameters(project: Project, parameters: PsiParameterList, preview: Boolean) {
+            if (expectedParams == null) {
+                return
+            }
             // We want to preserve captured locals
             val locals = parameters.parameters.dropWhile {
                 val fqname = (it.type as? PsiClassType)?.fullQualifiedName ?: return@dropWhile true
                 return@dropWhile fqname != MixinConstants.Classes.CALLBACK_INFO &&
                     fqname != MixinConstants.Classes.CALLBACK_INFO_RETURNABLE
             }.drop(1) // the first element in the list is the CallbackInfo but we don't want it
-            val newParams = expected.flatMapTo(mutableListOf()) {
+                .takeWhile { !it.isMixinExtrasSugar }
+
+            // We want to preserve sugars, and while we're at it, we might as well move them all to the end
+            val sugars = parameters.parameters.filter { it.isMixinExtrasSugar }
+
+            val newParams = expectedParams.flatMapTo(mutableListOf()) {
                 if (it.default) {
+                    val nameHelper = PsiNameHelper.getInstance(project)
+                    val languageLevel = PsiUtil.getLanguageLevel(parameters)
                     it.parameters.mapIndexed { i: Int, p: Parameter ->
-                        JavaPsiFacade.getElementFactory(project).createParameter(
-                            p.name ?: JavaCodeStyleManager.getInstance(project)
+                        val paramName = p.name?.takeIf { name -> nameHelper.isIdentifier(name, languageLevel) }
+                            ?: JavaCodeStyleManager.getInstance(project)
                                 .suggestVariableName(VariableKind.PARAMETER, null, null, p.type).names
-                                .firstOrNull() ?: "var$i",
-                            p.type
-                        )
+                                .firstOrNull()
+                            ?: "var$i"
+                        JavaPsiFacade.getElementFactory(project).createParameter(paramName, p.type)
                     }
                 } else {
                     emptyList()
                 }
             }
-            // Restore the captured locals before applying the fix
+            // Restore the captured locals and sugars before applying the fix
             newParams.addAll(locals)
-            parameters.synchronize(newParams)
+            newParams.addAll(sugars)
+            if (preview) {
+                parameters.synchronize(newParams)
+            } else {
+                runWriteAction {
+                    parameters.synchronize(newParams)
+                }
+            }
         }
+
+        private fun fixReturnType(method: PsiMethod, editor: Editor, file: PsiFile, preview: Boolean) {
+            if (expectedReturnType == null) {
+                return
+            }
+            val fix = QuickFixFactory.getInstance().createMethodReturnFix(method, expectedReturnType, false)
+            if (preview) {
+                fix.generatePreview(file.project, editor, file)
+            } else {
+                fix.applyFix()
+            }
+        }
+
+        private fun fixIntLikeTypes(method: PsiMethod, editor: Editor, preview: Boolean) {
+            if (intLikeTypePositions.isEmpty()) {
+                return
+            }
+            val runnable = {
+                val template = makeIntLikeTypeTemplate(method, intLikeTypePositions)
+                if (template != null) {
+                    editor.caretModel.moveToOffset(method.startOffset)
+                    TemplateManager.getInstance(method.project)
+                        .startTemplate(editor, template)
+                }
+            }
+
+            if (preview) {
+                runnable()
+            } else {
+                invokeLater {
+                    WriteCommandAction.runWriteCommandAction(
+                        method.project,
+                        "Choose Int-Like Type",
+                        null,
+                        runnable,
+                        method.parentOfType<PsiFile>()!!
+                    )
+                }
+            }
+        }
+
+        private fun makeIntLikeTypeTemplate(
+            method: PsiMethod,
+            positions: List<MethodSignature.TypePosition>
+        ): Template? {
+            val builder = TemplateBuilderImpl(method)
+            builder.replaceElement(
+                positions.first().getElement(method) ?: return null,
+                "intliketype",
+                ChooseIntLikeTypeExpression(),
+                true
+            )
+            for (pos in positions.drop(1)) {
+                builder.replaceElement(
+                    pos.getElement(method) ?: return null,
+                    VariableNode("intliketype", null),
+                    false
+                )
+            }
+            return builder.buildInlineTemplate()
+        }
+    }
+}
+
+private class ChooseIntLikeTypeExpression : Expression() {
+    private val lookupItems: Array<LookupElement> = intLikeTypes.map(LookupElementBuilder::create).toTypedArray()
+
+    override fun calculateLookupItems(context: ExpressionContext) = if (lookupItems.size > 1) lookupItems else null
+
+    override fun calculateQuickResult(context: ExpressionContext) = calculateResult(context)
+
+    override fun calculateResult(context: ExpressionContext) = TextResult("int")
+
+    private companion object {
+        private val intLikeTypes = listOf(
+            "int",
+            "char",
+            "boolean",
+            "byte",
+            "short"
+        )
     }
 }

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util
@@ -26,11 +36,14 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
             bukkitGroup.addTemplate(FileTemplateDescriptor(BUKKIT_MAIN_CLASS_TEMPLATE))
             bukkitGroup.addTemplate(FileTemplateDescriptor(BUKKIT_PLUGIN_YML_TEMPLATE))
             bukkitGroup.addTemplate(FileTemplateDescriptor(BUKKIT_BUILD_GRADLE_TEMPLATE))
-            bukkitGroup.addTemplate(FileTemplateDescriptor(BUKKIT_SUBMODULE_BUILD_GRADLE_TEMPLATE))
             bukkitGroup.addTemplate(FileTemplateDescriptor(BUKKIT_GRADLE_PROPERTIES_TEMPLATE))
             bukkitGroup.addTemplate(FileTemplateDescriptor(BUKKIT_SETTINGS_GRADLE_TEMPLATE))
             bukkitGroup.addTemplate(FileTemplateDescriptor(BUKKIT_POM_TEMPLATE))
-            bukkitGroup.addTemplate(FileTemplateDescriptor(BUKKIT_SUBMODULE_POM_TEMPLATE))
+        }
+
+        FileTemplateGroupDescriptor("Paper", PlatformAssets.PAPER_ICON).let { paperGroup ->
+            group.addTemplate(paperGroup)
+            paperGroup.addTemplate(FileTemplateDescriptor(PAPER_PLUGIN_YML_TEMPLATE))
         }
 
         FileTemplateGroupDescriptor("BungeeCord", PlatformAssets.BUNGEECORD_ICON).let { bungeeGroup ->
@@ -38,11 +51,9 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
             bungeeGroup.addTemplate(FileTemplateDescriptor(BUNGEECORD_MAIN_CLASS_TEMPLATE))
             bungeeGroup.addTemplate(FileTemplateDescriptor(BUNGEECORD_PLUGIN_YML_TEMPLATE))
             bungeeGroup.addTemplate(FileTemplateDescriptor(BUNGEECORD_BUILD_GRADLE_TEMPLATE))
-            bungeeGroup.addTemplate(FileTemplateDescriptor(BUNGEECORD_SUBMODULE_BUILD_GRADLE_TEMPLATE))
             bungeeGroup.addTemplate(FileTemplateDescriptor(BUNGEECORD_GRADLE_PROPERTIES_TEMPLATE))
             bungeeGroup.addTemplate(FileTemplateDescriptor(BUNGEECORD_SETTINGS_GRADLE_TEMPLATE))
             bungeeGroup.addTemplate(FileTemplateDescriptor(BUNGEECORD_POM_TEMPLATE))
-            bungeeGroup.addTemplate(FileTemplateDescriptor(BUNGEECORD_SUBMODULE_POM_TEMPLATE))
         }
 
         FileTemplateGroupDescriptor("Velocity", PlatformAssets.VELOCITY_ICON).let { velocityGroup ->
@@ -51,52 +62,37 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
             velocityGroup.addTemplate(FileTemplateDescriptor(VELOCITY_BUILD_CONSTANTS_TEMPLATE))
             velocityGroup.addTemplate(FileTemplateDescriptor(VELOCITY_MAIN_CLASS_V2_TEMPLATE))
             velocityGroup.addTemplate(FileTemplateDescriptor(VELOCITY_BUILD_GRADLE_TEMPLATE))
-            velocityGroup.addTemplate(FileTemplateDescriptor(VELOCITY_SUBMODULE_BUILD_GRADLE_TEMPLATE))
             velocityGroup.addTemplate(FileTemplateDescriptor(VELOCITY_GRADLE_PROPERTIES_TEMPLATE))
             velocityGroup.addTemplate(FileTemplateDescriptor(VELOCITY_SETTINGS_GRADLE_TEMPLATE))
             velocityGroup.addTemplate(FileTemplateDescriptor(VELOCITY_POM_TEMPLATE))
-            velocityGroup.addTemplate(FileTemplateDescriptor(VELOCITY_SUBMODULE_POM_TEMPLATE))
         }
 
         FileTemplateGroupDescriptor("Sponge", PlatformAssets.SPONGE_ICON).let { spongeGroup ->
             group.addTemplate(spongeGroup)
-            FileTemplateGroupDescriptor("Legacy", null).let { legacyGroup ->
-                spongeGroup.addTemplate(legacyGroup)
-                legacyGroup.addTemplate(template(SPONGE_MAIN_CLASS_TEMPLATE))
-                legacyGroup.addTemplate(template(SPONGE_BUILD_GRADLE_TEMPLATE))
-                legacyGroup.addTemplate(template(SPONGE_SUBMODULE_BUILD_GRADLE_TEMPLATE))
-                legacyGroup.addTemplate(template(SPONGE_GRADLE_PROPERTIES_TEMPLATE))
-                legacyGroup.addTemplate(template(SPONGE_SETTINGS_GRADLE_TEMPLATE))
-            }
             fun sponge8Template(fileName: String) = template(fileName, fileName.replace("8+ ", ""))
             spongeGroup.addTemplate(sponge8Template(SPONGE8_MAIN_CLASS_TEMPLATE))
             spongeGroup.addTemplate(sponge8Template(SPONGE8_PLUGINS_JSON_TEMPLATE))
             spongeGroup.addTemplate(sponge8Template(SPONGE8_BUILD_GRADLE_TEMPLATE))
-            spongeGroup.addTemplate(sponge8Template(SPONGE8_SUBMODULE_BUILD_GRADLE_TEMPLATE))
             spongeGroup.addTemplate(sponge8Template(SPONGE8_GRADLE_PROPERTIES_TEMPLATE))
             spongeGroup.addTemplate(sponge8Template(SPONGE8_SETTINGS_GRADLE_TEMPLATE))
             spongeGroup.addTemplate(template(SPONGE_POM_TEMPLATE))
-            spongeGroup.addTemplate(template(SPONGE_SUBMODULE_POM_TEMPLATE))
         }
 
         FileTemplateGroupDescriptor("Forge", PlatformAssets.FORGE_ICON).let { forgeGroup ->
             group.addTemplate(forgeGroup)
-            forgeGroup.addTemplate(FileTemplateDescriptor(FORGE_MAIN_CLASS_TEMPLATE))
-            forgeGroup.addTemplate(FileTemplateDescriptor(FORGE_BUILD_GRADLE_TEMPLATE))
-            forgeGroup.addTemplate(FileTemplateDescriptor(FORGE_SUBMODULE_BUILD_GRADLE_TEMPLATE))
-            forgeGroup.addTemplate(FileTemplateDescriptor(FORGE_GRADLE_PROPERTIES_TEMPLATE))
-            forgeGroup.addTemplate(FileTemplateDescriptor(FORGE_SETTINGS_GRADLE_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(FORGE_MIXINS_JSON_TEMPLATE, PlatformAssets.FORGE_ICON))
-            forgeGroup.addTemplate(FileTemplateDescriptor(FG3_MAIN_CLASS_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(FG3_1_16_MAIN_CLASS_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(FG3_1_17_MAIN_CLASS_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(FG3_1_18_MAIN_CLASS_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(FG3_1_19_MAIN_CLASS_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(FG3_1_19_3_MAIN_CLASS_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(FG3_1_20_MAIN_CLASS_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(FG3_1_20_6_MAIN_CLASS_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(FG3_1_20_CONFIG_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(FG3_1_21_CONFIG_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(FG3_BUILD_GRADLE_TEMPLATE))
-            forgeGroup.addTemplate(FileTemplateDescriptor(FG3_SUBMODULE_BUILD_GRADLE_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(FG3_GRADLE_PROPERTIES_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(FG3_SETTINGS_GRADLE_TEMPLATE))
-            forgeGroup.addTemplate(FileTemplateDescriptor(MCMOD_INFO_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(MODS_TOML_TEMPLATE))
             forgeGroup.addTemplate(FileTemplateDescriptor(PACK_MCMETA_TEMPLATE))
         }
@@ -105,35 +101,11 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
             group.addTemplate(fabricGroup)
             fabricGroup.addTemplate(FileTemplateDescriptor(FABRIC_BUILD_GRADLE_TEMPLATE, PlatformAssets.FABRIC_ICON))
             fabricGroup.addTemplate(
-                FileTemplateDescriptor(FABRIC_GRADLE_PROPERTIES_TEMPLATE, PlatformAssets.FABRIC_ICON)
+                FileTemplateDescriptor(FABRIC_GRADLE_PROPERTIES_TEMPLATE, PlatformAssets.FABRIC_ICON),
             )
             fabricGroup.addTemplate(FileTemplateDescriptor(FABRIC_MIXINS_JSON_TEMPLATE, PlatformAssets.FABRIC_ICON))
             fabricGroup.addTemplate(FileTemplateDescriptor(FABRIC_MOD_JSON_TEMPLATE, PlatformAssets.FABRIC_ICON))
             fabricGroup.addTemplate(FileTemplateDescriptor(FABRIC_SETTINGS_GRADLE_TEMPLATE, PlatformAssets.FABRIC_ICON))
-            fabricGroup.addTemplate(
-                FileTemplateDescriptor(FABRIC_SUBMODULE_BUILD_GRADLE_TEMPLATE, PlatformAssets.FABRIC_ICON)
-            )
-            fabricGroup.addTemplate(
-                FileTemplateDescriptor(FABRIC_SUBMODULE_GRADLE_PROPERTIES_TEMPLATE, PlatformAssets.FABRIC_ICON)
-            )
-        }
-
-        FileTemplateGroupDescriptor("LiteLoader", PlatformAssets.LITELOADER_ICON).let { liteGroup ->
-            group.addTemplate(liteGroup)
-            liteGroup.addTemplate(FileTemplateDescriptor(LITELOADER_MAIN_CLASS_TEMPLATE))
-            liteGroup.addTemplate(FileTemplateDescriptor(LITELOADER_BUILD_GRADLE_TEMPLATE))
-            liteGroup.addTemplate(FileTemplateDescriptor(LITELOADER_SUBMODULE_BUILD_GRADLE_TEMPLATE))
-            liteGroup.addTemplate(FileTemplateDescriptor(LITELOADER_GRADLE_PROPERTIES_TEMPLATE))
-            liteGroup.addTemplate(FileTemplateDescriptor(LITELOADER_SETTINGS_GRADLE_TEMPLATE))
-        }
-
-        FileTemplateGroupDescriptor("Multi-Module", PlatformAssets.MINECRAFT_ICON).let { multiGroup ->
-            group.addTemplate(multiGroup)
-            multiGroup.addTemplate(FileTemplateDescriptor(MULTI_MODULE_BUILD_GRADLE_TEMPLATE))
-            multiGroup.addTemplate(FileTemplateDescriptor(MULTI_MODULE_GRADLE_PROPERTIES_TEMPLATE))
-            multiGroup.addTemplate(FileTemplateDescriptor(MULTI_MODULE_SETTINGS_GRADLE_TEMPLATE))
-            multiGroup.addTemplate(FileTemplateDescriptor(MULTI_MODULE_POM_TEMPLATE))
-            multiGroup.addTemplate(FileTemplateDescriptor(MULTI_MODULE_COMMON_POM_TEMPLATE))
         }
 
         FileTemplateGroupDescriptor("Mixin", PlatformAssets.MIXIN_ICON).let { mixinGroup ->
@@ -141,10 +113,29 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
             mixinGroup.addTemplate(FileTemplateDescriptor(MIXIN_OVERWRITE_FALLBACK))
         }
 
+        FileTemplateGroupDescriptor("NeoForge", PlatformAssets.NEOFORGE_ICON).let { forgeGroup ->
+            group.addTemplate(forgeGroup)
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_MIXINS_JSON_TEMPLATE, PlatformAssets.NEOFORGE_ICON))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_MAIN_CLASS_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_CONFIG_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_BUILD_GRADLE_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_GRADLE_PROPERTIES_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_SETTINGS_GRADLE_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_MODS_TOML_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_PACK_MCMETA_TEMPLATE))
+
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_BLOCK_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_ITEM_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_PACKET_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_ENCHANTMENT_TEMPLATE))
+            forgeGroup.addTemplate(FileTemplateDescriptor(NEOFORGE_MOB_EFFECT_TEMPLATE))
+        }
+
         FileTemplateGroupDescriptor("Common", PlatformAssets.MINECRAFT_ICON).let { commonGroup ->
             group.addTemplate(commonGroup)
             commonGroup.addTemplate(FileTemplateDescriptor(GRADLE_GITIGNORE_TEMPLATE))
             commonGroup.addTemplate(FileTemplateDescriptor(MAVEN_GITIGNORE_TEMPLATE))
+            commonGroup.addTemplate(FileTemplateDescriptor(GRADLE_WRAPPER_PROPERTIES))
         }
 
         FileTemplateGroupDescriptor("Skeletons", GeneralAssets.MC_TEMPLATE).let { skeletonGroup ->
@@ -172,6 +163,7 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
                 fabricSkeletonGroup.addTemplate(FileTemplateDescriptor(FABRIC_BLOCK_TEMPLATE))
                 fabricSkeletonGroup.addTemplate(FileTemplateDescriptor(FABRIC_ITEM_TEMPLATE))
                 fabricSkeletonGroup.addTemplate(FileTemplateDescriptor(FABRIC_ENCHANTMENT_TEMPLATE))
+                fabricSkeletonGroup.addTemplate(FileTemplateDescriptor(FABRIC_STATUS_EFFECT_TEMPLATE))
             }
         }
 
@@ -189,62 +181,47 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
         const val BUKKIT_MAIN_CLASS_TEMPLATE = "Bukkit Main Class.java"
         const val BUKKIT_PLUGIN_YML_TEMPLATE = "Bukkit plugin.yml"
         const val BUKKIT_BUILD_GRADLE_TEMPLATE = "Bukkit build.gradle"
-        const val BUKKIT_SUBMODULE_BUILD_GRADLE_TEMPLATE = "Bukkit Submodule build.gradle"
         const val BUKKIT_GRADLE_PROPERTIES_TEMPLATE = "Bukkit gradle.properties"
         const val BUKKIT_SETTINGS_GRADLE_TEMPLATE = "Bukkit settings.gradle"
         const val BUKKIT_POM_TEMPLATE = "Bukkit pom.xml"
-        const val BUKKIT_SUBMODULE_POM_TEMPLATE = "Bukkit Submodule pom.xml"
+
+        const val PAPER_PLUGIN_YML_TEMPLATE = "Paper paper-plugin.yml"
 
         const val BUNGEECORD_MAIN_CLASS_TEMPLATE = "BungeeCord Main Class.java"
         const val BUNGEECORD_PLUGIN_YML_TEMPLATE = "BungeeCord bungee.yml"
         const val BUNGEECORD_BUILD_GRADLE_TEMPLATE = "BungeeCord build.gradle"
-        const val BUNGEECORD_SUBMODULE_BUILD_GRADLE_TEMPLATE = "BungeeCord Submodule build.gradle"
         const val BUNGEECORD_GRADLE_PROPERTIES_TEMPLATE = "BungeeCord gradle.properties"
         const val BUNGEECORD_SETTINGS_GRADLE_TEMPLATE = "BungeeCord settings.gradle"
         const val BUNGEECORD_POM_TEMPLATE = "BungeeCord pom.xml"
-        const val BUNGEECORD_SUBMODULE_POM_TEMPLATE = "BungeeCord Submodule pom.xml"
 
         const val VELOCITY_MAIN_CLASS_TEMPLATE = "Velocity Main Class.java"
         const val VELOCITY_MAIN_CLASS_V2_TEMPLATE = "Velocity Main Class V2.java"
         const val VELOCITY_BUILD_CONSTANTS_TEMPLATE = "Velocity Build Constants.java"
         const val VELOCITY_BUILD_GRADLE_TEMPLATE = "Velocity build.gradle"
-        const val VELOCITY_SUBMODULE_BUILD_GRADLE_TEMPLATE = "Velocity Submodule build.gradle"
         const val VELOCITY_GRADLE_PROPERTIES_TEMPLATE = "Velocity gradle.properties"
         const val VELOCITY_SETTINGS_GRADLE_TEMPLATE = "Velocity settings.gradle"
         const val VELOCITY_POM_TEMPLATE = "Velocity pom.xml"
-        const val VELOCITY_SUBMODULE_POM_TEMPLATE = "Velocity Submodule pom.xml"
 
-        const val SPONGE_MAIN_CLASS_TEMPLATE = "Sponge Main Class.java"
-        const val SPONGE_BUILD_GRADLE_TEMPLATE = "Sponge build.gradle"
-        const val SPONGE_SUBMODULE_BUILD_GRADLE_TEMPLATE = "Sponge Submodule build.gradle"
-        const val SPONGE_GRADLE_PROPERTIES_TEMPLATE = "Sponge gradle.properties"
-        const val SPONGE_SETTINGS_GRADLE_TEMPLATE = "Sponge settings.gradle"
         const val SPONGE_POM_TEMPLATE = "Sponge pom.xml"
-        const val SPONGE_SUBMODULE_POM_TEMPLATE = "Sponge Submodule pom.xml"
-
         const val SPONGE8_MAIN_CLASS_TEMPLATE = "Sponge 8+ Main Class.java"
         const val SPONGE8_PLUGINS_JSON_TEMPLATE = "Sponge 8+ sponge_plugins.json"
         const val SPONGE8_BUILD_GRADLE_TEMPLATE = "Sponge 8+ build.gradle.kts"
-        const val SPONGE8_SUBMODULE_BUILD_GRADLE_TEMPLATE = "Sponge 8+ Submodule build.gradle.kts"
         const val SPONGE8_GRADLE_PROPERTIES_TEMPLATE = "Sponge 8+ gradle.properties"
         const val SPONGE8_SETTINGS_GRADLE_TEMPLATE = "Sponge 8+ settings.gradle.kts"
 
-        const val FORGE_MAIN_CLASS_TEMPLATE = "Forge Main Class.java"
-        const val FORGE_BUILD_GRADLE_TEMPLATE = "Forge build.gradle"
-        const val FORGE_SUBMODULE_BUILD_GRADLE_TEMPLATE = "Forge Submodule build.gradle"
-        const val FORGE_GRADLE_PROPERTIES_TEMPLATE = "Forge gradle.properties"
         const val FORGE_MIXINS_JSON_TEMPLATE = "Forge Mixins Config.json"
-        const val FORGE_SETTINGS_GRADLE_TEMPLATE = "Forge settings.gradle"
-        const val FG3_MAIN_CLASS_TEMPLATE = "Forge (1.13+) Main Class.java"
+        const val FG3_1_16_MAIN_CLASS_TEMPLATE = "Forge (1.16+) Main Class.java"
         const val FG3_1_17_MAIN_CLASS_TEMPLATE = "Forge (1.17+) Main Class.java"
         const val FG3_1_18_MAIN_CLASS_TEMPLATE = "Forge (1.18+) Main Class.java"
         const val FG3_1_19_MAIN_CLASS_TEMPLATE = "Forge (1.19+) Main Class.java"
         const val FG3_1_19_3_MAIN_CLASS_TEMPLATE = "Forge (1.19.3+) Main Class.java"
+        const val FG3_1_20_MAIN_CLASS_TEMPLATE = "Forge (1.20+) Main Class.java"
+        const val FG3_1_20_6_MAIN_CLASS_TEMPLATE = "Forge (1.20.6+) Main Class.java"
+        const val FG3_1_20_CONFIG_TEMPLATE = "Forge (1.20+) Config.java"
+        const val FG3_1_21_CONFIG_TEMPLATE = "Forge (1.21+) Config.java"
         const val FG3_BUILD_GRADLE_TEMPLATE = "Forge (1.13+) build.gradle"
-        const val FG3_SUBMODULE_BUILD_GRADLE_TEMPLATE = "Forge (1.13+) Submodule build.gradle"
         const val FG3_GRADLE_PROPERTIES_TEMPLATE = "Forge (1.13+) gradle.properties"
         const val FG3_SETTINGS_GRADLE_TEMPLATE = "Forge (1.13+) settings.gradle"
-        const val MCMOD_INFO_TEMPLATE = "mcmod.info"
         const val MODS_TOML_TEMPLATE = "mods.toml"
         const val PACK_MCMETA_TEMPLATE = "pack.mcmeta"
 
@@ -253,13 +230,9 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
         const val FABRIC_MIXINS_JSON_TEMPLATE = "fabric_mixins.json"
         const val FABRIC_MOD_JSON_TEMPLATE = "fabric_mod.json"
         const val FABRIC_SETTINGS_GRADLE_TEMPLATE = "fabric_settings.gradle"
-        const val FABRIC_SUBMODULE_BUILD_GRADLE_TEMPLATE = "fabric_submodule_build.gradle"
-        const val FABRIC_SUBMODULE_GRADLE_PROPERTIES_TEMPLATE = "fabric_submodule_gradle.properties"
 
         const val ARCHITECTURY_BUILD_GRADLE_TEMPLATE = "architectury_build.gradle"
         const val ARCHITECTURY_GRADLE_PROPERTIES_TEMPLATE = "architectury_gradle.properties"
-        const val ARCHITECTURY_SUBMODULE_BUILD_GRADLE_TEMPLATE = "architectury_submodule_build.gradle"
-        const val ARCHITECTURY_SUBMODULE_GRADLE_PROPERTIES_TEMPLATE = "architectury_submodule_gradle.properties"
         const val ARCHITECTURY_SETTINGS_GRADLE_TEMPLATE = "architectury_settings.gradle"
         const val ARCHITECTURY_COMMON_BUILD_GRADLE_TEMPLATE = "architectury_common_build.gradle"
         const val ARCHITECTURY_COMMON_MAIN_CLASS_TEMPLATE = "architectury_common_main_class.java"
@@ -275,20 +248,9 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
         const val ARCHITECTURY_FORGE_MODS_TOML_TEMPLATE = "architectury_forge_mods.toml"
         const val ARCHITECTURY_FORGE_PACK_MCMETA_TEMPLATE = "architectury_forge_pack.mcmeta"
 
-        const val LITELOADER_MAIN_CLASS_TEMPLATE = "LiteLoader Main Class.java"
-        const val LITELOADER_BUILD_GRADLE_TEMPLATE = "LiteLoader build.gradle"
-        const val LITELOADER_SUBMODULE_BUILD_GRADLE_TEMPLATE = "LiteLoader Submodule build.gradle"
-        const val LITELOADER_GRADLE_PROPERTIES_TEMPLATE = "LiteLoader gradle.properties"
-        const val LITELOADER_SETTINGS_GRADLE_TEMPLATE = "LiteLoader settings.gradle"
-
-        const val MULTI_MODULE_BUILD_GRADLE_TEMPLATE = "Multi-Module Base build.gradle"
-        const val MULTI_MODULE_GRADLE_PROPERTIES_TEMPLATE = "Multi-Module Base gradle.properties"
-        const val MULTI_MODULE_SETTINGS_GRADLE_TEMPLATE = "Multi-Module Base settings.gradle"
-        const val MULTI_MODULE_POM_TEMPLATE = "Multi-Module Base pom.xml"
-        const val MULTI_MODULE_COMMON_POM_TEMPLATE = "Multi-Module Common pom.xml"
-
         const val MIXIN_OVERWRITE_FALLBACK = "Mixin Overwrite Fallback.java"
 
+        const val GRADLE_WRAPPER_PROPERTIES = "MinecraftDev gradle-wrapper.properties"
         const val GRADLE_GITIGNORE_TEMPLATE = "Gradle.gitignore"
         const val MAVEN_GITIGNORE_TEMPLATE = "Maven.gitignore"
 
@@ -308,6 +270,29 @@ class MinecraftTemplates : FileTemplateGroupDescriptorFactory {
         const val FABRIC_BLOCK_TEMPLATE = "FabricBlock.java"
         const val FABRIC_ITEM_TEMPLATE = "FabricItem.java"
         const val FABRIC_ENCHANTMENT_TEMPLATE = "FabricEnchantment.java"
+        const val FABRIC_STATUS_EFFECT_TEMPLATE = "FabricStatusEffect.java"
+
+        const val NEOFORGE_MIXINS_JSON_TEMPLATE = "NeoForge Mixins Config.json"
+        const val NEOFORGE_MAIN_CLASS_TEMPLATE = "NeoForge Main Class.java"
+        const val NEOFORGE_CONFIG_TEMPLATE = "NeoForge Config.java"
+        const val NEOFORGE_BUILD_GRADLE_TEMPLATE = "NeoForge build.gradle"
+        const val NEOFORGE_GRADLE_PROPERTIES_TEMPLATE = "NeoForge gradle.properties"
+        const val NEOFORGE_SETTINGS_GRADLE_TEMPLATE = "NeoForge settings.gradle"
+        const val NEOFORGE_MODS_TOML_TEMPLATE = "NeoForge mods.toml"
+        const val NEOFORGE_NEOFORGE_MODS_TOML_TEMPLATE = "NeoForge neoforge.mods.toml"
+        const val NEOFORGE_PACK_MCMETA_TEMPLATE = "NeoForge pack.mcmeta"
+
+        const val NEOFORGE_1_20_5_MAIN_CLASS_TEMPLATE = "NeoForge (1.20.5) Main Class.java"
+        const val NEOFORGE_1_20_5_CONFIG_TEMPLATE = "NeoForge (1.20.5) Config.java"
+        const val NEOFORGE_1_20_5_BUILD_GRADLE_TEMPLATE = "NeoForge (1.20.5) build.gradle"
+
+        const val NEOFORGE_1_21_CONFIG_TEMPLATE = "NeoForge (1.21) Config.java"
+
+        const val NEOFORGE_BLOCK_TEMPLATE = "NeoForgeBlock.java"
+        const val NEOFORGE_ITEM_TEMPLATE = "NeoForgeItem.java"
+        const val NEOFORGE_PACKET_TEMPLATE = "NeoForgePacket.java"
+        const val NEOFORGE_ENCHANTMENT_TEMPLATE = "NeoForgeEnchantment.java"
+        const val NEOFORGE_MOB_EFFECT_TEMPLATE = "NeoForgeMobEffect.java"
     }
 
     private fun template(fileName: String, displayName: String? = null) = CustomDescriptor(fileName, displayName)

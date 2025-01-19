@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.completion
@@ -51,7 +61,7 @@ private class MixinMethodLookupItem(private val shadow: MethodTargetMember, priv
             val psiMethod = shadow.classAndMethod.method.findOrConstructSourceMethod(
                 shadow.classAndMethod.clazz,
                 project,
-                canDecompile = false
+                canDecompile = false,
             )
             return MixinMethodLookupItem(shadow, psiMethod)
         }
@@ -60,7 +70,7 @@ private class MixinMethodLookupItem(private val shadow: MethodTargetMember, priv
 
 private class MixinFieldLookupItem(
     private val shadow: FieldTargetMember,
-    private val field: PsiField
+    private val field: PsiField,
 ) : VariableLookupItem(field) {
 
     override fun handleInsert(context: InsertionContext) {
@@ -78,7 +88,7 @@ private class MixinFieldLookupItem(
             val psiField = shadow.classAndField.field.findOrConstructSourceField(
                 shadow.classAndField.clazz,
                 project,
-                canDecompile = false
+                canDecompile = false,
             )
             return MixinFieldLookupItem(shadow, psiField)
         }
@@ -100,7 +110,7 @@ private fun insertShadow(context: InsertionContext, shadow: MixinTargetMember, e
         context.setLaterRunnable {
             HintManager.getInstance().showInformationHint(
                 context.editor,
-                "Added @Shadow for '${element.name}' to super Mixin ${mixinClass.shortName}"
+                "Added @Shadow for '${element.name}' to super Mixin ${mixinClass.shortName}",
             )
         }
     }

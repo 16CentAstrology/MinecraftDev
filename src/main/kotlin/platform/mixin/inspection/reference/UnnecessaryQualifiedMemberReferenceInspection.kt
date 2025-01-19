@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.inspection.reference
@@ -24,7 +34,6 @@ import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiAnnotationMemberValue
 import com.intellij.psi.PsiArrayInitializerMemberValue
-import com.intellij.psi.PsiLiteral
 
 class UnnecessaryQualifiedMemberReferenceInspection : MixinAnnotationAttributeInspection("method") {
 
@@ -33,7 +42,7 @@ class UnnecessaryQualifiedMemberReferenceInspection : MixinAnnotationAttributeIn
     override fun visitAnnotationAttribute(
         annotation: PsiAnnotation,
         value: PsiAnnotationMemberValue,
-        holder: ProblemsHolder
+        holder: ProblemsHolder,
     ) {
         val qName = annotation.qualifiedName ?: return
         if (MixinAnnotationHandler.forMixinAnnotation(qName, annotation.project) !is InjectorAnnotationHandler) {
@@ -41,8 +50,8 @@ class UnnecessaryQualifiedMemberReferenceInspection : MixinAnnotationAttributeIn
         }
 
         when (value) {
-            is PsiLiteral -> checkMemberReference(value, holder)
             is PsiArrayInitializerMemberValue -> value.initializers.forEach { checkMemberReference(it, holder) }
+            else -> checkMemberReference(value, holder)
         }
     }
 
@@ -52,7 +61,7 @@ class UnnecessaryQualifiedMemberReferenceInspection : MixinAnnotationAttributeIn
             holder.registerProblem(
                 value,
                 "Unnecessary qualified reference to '${selector.displayName}' in target class",
-                QuickFix(selector)
+                QuickFix(selector),
             )
         }
     }
@@ -65,7 +74,7 @@ class UnnecessaryQualifiedMemberReferenceInspection : MixinAnnotationAttributeIn
             val element = descriptor.psiElement
             element.replace(
                 JavaPsiFacade.getElementFactory(project)
-                    .createExpressionFromText("\"${reference.withoutOwner.toMixinString()}\"", element)
+                    .createExpressionFromText("\"${reference.withoutOwner.toMixinString()}\"", element),
             )
         }
     }

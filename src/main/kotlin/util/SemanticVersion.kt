@@ -1,15 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util
 
+import com.demonwav.mcdev.creator.custom.model.TemplateApi
 import com.demonwav.mcdev.util.SemanticVersion.Companion.VersionPart.PreReleasePart
 import com.demonwav.mcdev.util.SemanticVersion.Companion.VersionPart.ReleasePart
 import com.demonwav.mcdev.util.SemanticVersion.Companion.VersionPart.TextPart
@@ -20,9 +31,10 @@ import java.net.URLDecoder
  * Each constituent part (delimited by periods in a version string) contributes
  * to the version ranking with decreasing priority from left to right.
  */
+@TemplateApi
 class SemanticVersion(
     val parts: List<VersionPart>,
-    private val buildMetadata: String = ""
+    private val buildMetadata: String = "",
 ) : Comparable<SemanticVersion> {
 
     private fun createVersionString(): String {
@@ -73,7 +85,7 @@ class SemanticVersion(
         val TEXT_PRIORITIES = mapOf(
             "snapshot" to 0,
             "rc" to 1,
-            "pre" to 1
+            "pre" to 1,
         )
 
         /**
@@ -86,6 +98,14 @@ class SemanticVersion(
          */
         fun release(vararg parts: Int) = SemanticVersion(parts.map { ReleasePart(it, it.toString()) })
 
+        fun tryParse(value: String): SemanticVersion? {
+            return try {
+                parse(value)
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+        }
+
         /**
          * Parses a version string into a comparable representation.
          * @throws IllegalArgumentException if any part of the version string cannot be parsed as integer or split into text parts.
@@ -97,7 +117,7 @@ class SemanticVersion(
                 } else {
                     throw IllegalArgumentException(
                         "Failed to parse version part as integer: $part " +
-                            "(whole version text: $value)"
+                            "(whole version text: $value)",
                     )
                 }
 
@@ -106,7 +126,7 @@ class SemanticVersion(
                 versionPart: String,
                 preReleasePart: String,
                 separator: Char,
-                versionString: String
+                versionString: String,
             ): VersionPart {
                 val version = parseInt(versionPart)
                 if (!preReleasePart.contains('.')) {
@@ -130,6 +150,24 @@ class SemanticVersion(
                     return PreReleasePart(version, separator, subParts, versionString)
                 }
             }
+
+            // Regular Minecraft snapshot versions e.g. 24w39a
+            fun parseMinecraftSnapshot(value: String): SemanticVersion? {
+                if (value.length != 6 || value[2] != 'w' || !value[5].isLetter()) {
+                    return null
+                }
+
+                val shortYear = value.substring(0, 2).toIntOrNull() ?: return null
+                val week = value.substring(3, 5).toIntOrNull() ?: return null
+
+                val subParts = listOf(ReleasePart(week, week.toString()), TextPart(value[5].toString()))
+                val mainPart = PreReleasePart(shortYear, 'w', subParts, value)
+                return SemanticVersion(
+                    listOf(mainPart),
+                )
+            }
+
+            parseMinecraftSnapshot(value)?.let { return it }
 
             val decodedValue = value.split('+').joinToString("+") { URLDecoder.decode(it, Charsets.UTF_8) }
             val mainPartAndMetadata = decodedValue.split("+", limit = 2)
@@ -196,7 +234,7 @@ class SemanticVersion(
                 val version: Int,
                 val separator: Char,
                 val subParts: List<VersionPart>,
-                override val versionString: String
+                override val versionString: String,
             ) : VersionPart() {
 
                 override fun compareTo(other: VersionPart): Int =

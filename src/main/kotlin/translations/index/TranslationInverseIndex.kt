@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.index
@@ -54,7 +64,7 @@ class TranslationInverseIndex : FileBasedIndexExtension<String, Void>() {
                     locale == null || TranslationFiles.getLocale(it) == locale
                 }
                 .flatMap {
-                    TranslationProvider.INSTANCES[it.fileType]?.findElements(project, it, key) ?: emptyList()
+                    TranslationProvider.INSTANCES[it.fileType.name]?.findElements(project, it, key) ?: emptyList()
                 }
         }
     }
@@ -62,7 +72,7 @@ class TranslationInverseIndex : FileBasedIndexExtension<String, Void>() {
     private object Indexer : DataIndexer<String, Void, FileContent> {
         override fun map(inputData: FileContent): MutableMap<String, Void?> {
             val domain = inputData.file.mcDomain ?: return mutableMapOf()
-            val entry = TranslationProvider.INSTANCES[inputData.fileType]?.map(domain, inputData)
+            val entry = TranslationProvider.INSTANCES[inputData.fileType.name]?.map(domain, inputData)
                 ?: return mutableMapOf()
             return entry.translations.associateTo(mutableMapOf()) { it.key to null }
         }

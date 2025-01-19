@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.forge.reflection.reference
@@ -21,17 +31,11 @@ import com.intellij.lang.jvm.JvmModifier
 import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.command.CommandProcessor
 import com.intellij.psi.JavaPsiFacade
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiClassObjectAccessExpression
-import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiElementResolveResult
 import com.intellij.psi.PsiExpressionList
 import com.intellij.psi.PsiLiteral
 import com.intellij.psi.PsiReference
-import com.intellij.psi.PsiReferenceBase
 import com.intellij.psi.PsiReferenceProvider
-import com.intellij.psi.ResolveResult
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.util.ProcessingContext
 
@@ -44,9 +48,12 @@ object ReflectedFieldReference : PsiReferenceProvider() {
         return arrayOf(Reference(element as PsiLiteral))
     }
 
-    class Reference(element: PsiLiteral) : PsiReferenceBase.Poly<PsiLiteral>(element) {
+    class Reference(element: PsiLiteral) : ReflectedMemberReferenceBasePoly(element) {
         val fieldName
             get() = element.constantStringValue ?: ""
+
+        override val memberName: String
+            get() = fieldName
 
         override fun getVariants(): Array<Any> {
             val typeClass = findReferencedClass() ?: return arrayOf()
@@ -60,9 +67,9 @@ object ReflectedFieldReference : PsiReferenceProvider() {
                             ?: return@withInsertHandler
 
                         val srgManager = literal.findModule()?.let { MinecraftFacet.getInstance(it) }
-                            ?.getModuleOfType(McpModuleType)?.srgManager
-                        val srgMap = srgManager?.srgMapNow
-                        val srgField = srgMap?.getSrgField(field.simpleQualifiedMemberReference)
+                            ?.getModuleOfType(McpModuleType)?.mappingsManager
+                        val srgMap = srgManager?.mappingsNow
+                        val srgField = srgMap?.getIntermediaryField(field.simpleQualifiedMemberReference)
                             ?: return@withInsertHandler
 
                         context.setLaterRunnable {
@@ -76,7 +83,7 @@ object ReflectedFieldReference : PsiReferenceProvider() {
                                     val elementFactory = JavaPsiFacade.getElementFactory(context.project)
                                     val srgLiteral = elementFactory.createExpressionFromText(
                                         "\"${srgField.name}\"",
-                                        literal.parent
+                                        literal.parent,
                                     )
                                     literal.replace(srgLiteral)
 
@@ -89,28 +96,6 @@ object ReflectedFieldReference : PsiReferenceProvider() {
                     }
                 }
                 .toTypedArray()
-        }
-
-        override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
-            val typeClass = findReferencedClass() ?: return arrayOf()
-
-            val name = fieldName
-            val srgManager = element.findModule()?.let { MinecraftFacet.getInstance(it) }
-                ?.getModuleOfType(McpModuleType)?.srgManager
-            val srgMap = srgManager?.srgMapNow
-            val mcpName = srgMap?.mapMcpToSrgName(name) ?: name
-
-            return typeClass.allFields.asSequence()
-                .filter { it.name == mcpName }
-                .map(::PsiElementResolveResult)
-                .toTypedArray()
-        }
-
-        private fun findReferencedClass(): PsiClass? {
-            val callParams = element.parent as? PsiExpressionList
-            val classRef = callParams?.expressions?.first() as? PsiClassObjectAccessExpression
-            val type = classRef?.operand?.type as? PsiClassType
-            return type?.resolve()
         }
     }
 }

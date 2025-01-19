@@ -1,32 +1,55 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.handlers.injectionPoint
 
+import com.demonwav.mcdev.platform.mixin.reference.MixinSelector
 import com.demonwav.mcdev.platform.mixin.reference.isMiscDynamicSelector
 import com.demonwav.mcdev.platform.mixin.reference.parseMixinSelector
 import com.demonwav.mcdev.platform.mixin.reference.target.TargetReference
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.SLICE
+import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Classes.SHIFT
 import com.demonwav.mcdev.platform.mixin.util.findSourceElement
 import com.demonwav.mcdev.util.computeStringArray
 import com.demonwav.mcdev.util.constantStringValue
+import com.demonwav.mcdev.util.constantValue
+import com.demonwav.mcdev.util.equivalentTo
+import com.demonwav.mcdev.util.fullQualifiedName
 import com.intellij.codeInsight.lookup.LookupElementBuilder
+import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiAnnotation
+import com.intellij.psi.PsiAnnotationMemberValue
+import com.intellij.psi.PsiArrayInitializerMemberValue
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiEnumConstant
 import com.intellij.psi.PsiExpression
+import com.intellij.psi.PsiModifierList
 import com.intellij.psi.PsiQualifiedReference
 import com.intellij.psi.PsiReference
+import com.intellij.psi.PsiReferenceExpression
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.util.PsiUtil
 import com.intellij.psi.util.parentOfType
+import com.intellij.psi.util.parents
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.MethodNode
 
@@ -55,11 +78,12 @@ import org.objectweb.asm.tree.MethodNode
 class AtResolver(
     private val at: PsiAnnotation,
     private val targetClass: ClassNode,
-    private val targetMethod: MethodNode
+    private val targetMethod: MethodNode,
 ) {
     companion object {
         private fun getInjectionPoint(at: PsiAnnotation): InjectionPoint<*>? {
-            var atCode = at.findDeclaredAttributeValue("value")?.constantStringValue ?: return null
+            var atCode = at.qualifiedName?.let { InjectionPointAnnotation.atCodeFor(it) }
+                ?: at.findDeclaredAttributeValue("value")?.constantStringValue ?: return null
 
             // remove slice selector
             val isInSlice = at.parentOfType<PsiAnnotation>()?.hasQualifiedName(SLICE) ?: false
@@ -78,8 +102,8 @@ class AtResolver(
         }
 
         fun getArgs(at: PsiAnnotation): Map<String, String> {
-            val args = at.findAttributeValue("args")?.computeStringArray() ?: return emptyMap()
-            return args.asSequence()
+            val args = at.findAttributeValue("args")?.computeStringArray().orEmpty()
+            val explicitArgs = args.asSequence()
                 .map {
                     val parts = it.split('=', limit = 2)
                     if (parts.size == 1) {
@@ -89,6 +113,54 @@ class AtResolver(
                     }
                 }
                 .toMap()
+            return getInherentArgs(at) + explicitArgs
+        }
+
+        private fun getInherentArgs(at: PsiAnnotation): Map<String, String> {
+            return at.attributes.asSequence()
+                .mapNotNull {
+                    val name = it.attributeName
+                    val value = at.findAttributeValue(name) ?: return@mapNotNull null
+                    val string = valueToString(value) ?: return@mapNotNull null
+                    name to string
+                }
+                .toMap()
+        }
+
+        private fun valueToString(value: PsiAnnotationMemberValue): String? {
+            if (value is PsiArrayInitializerMemberValue) {
+                return value.initializers.map { valueToString(it) ?: return null }.joinToString(",")
+            }
+            return when (val constant = value.constantValue) {
+                is PsiClassType -> constant.fullQualifiedName?.replace('.', '/')
+                null -> when (value) {
+                    is PsiReferenceExpression -> value.referenceName
+                    else -> null
+                }
+                else -> constant.toString()
+            }
+        }
+
+        fun findInjectorAnnotation(at: PsiAnnotation): PsiAnnotation? {
+            return at.parents(false)
+                .takeWhile { it !is PsiClass }
+                .filterIsInstance<PsiAnnotation>()
+                .firstOrNull { it.parent is PsiModifierList }
+        }
+
+        fun getShift(at: PsiAnnotation): Int {
+            val shiftAttr = at.findDeclaredAttributeValue("shift") as? PsiExpression ?: return 0
+            val shiftReference = PsiUtil.skipParenthesizedExprDown(shiftAttr) as? PsiReferenceExpression ?: return 0
+            val shift = shiftReference.resolve() as? PsiEnumConstant ?: return 0
+            val containingClass = shift.containingClass ?: return 0
+            val shiftClass = JavaPsiFacade.getInstance(at.project).findClass(SHIFT, at.resolveScope) ?: return 0
+            if (!(containingClass equivalentTo shiftClass)) return 0
+            return when (shift.name) {
+                "BEFORE" -> -1
+                "AFTER" -> 1
+                "BY" -> at.findDeclaredAttributeValue("by")?.constantValue as? Int ?: 0
+                else -> 0
+            }
         }
     }
 
@@ -101,8 +173,8 @@ class AtResolver(
         val collectVisitor = injectionPoint.createCollectVisitor(
             at,
             target,
-            targetClass,
-            CollectVisitor.Mode.MATCH_FIRST
+            getTargetClass(target),
+            CollectVisitor.Mode.MATCH_FIRST,
         )
         if (collectVisitor == null) {
             // syntax error in target
@@ -130,7 +202,7 @@ class AtResolver(
         val targetAttr = at.findAttributeValue("target")
         val target = targetAttr?.let { parseMixinSelector(it) }
 
-        val collectVisitor = injectionPoint.createCollectVisitor(at, target, targetClass, mode)
+        val collectVisitor = injectionPoint.createCollectVisitor(at, target, getTargetClass(target), mode)
             ?: return InsnResolutionInfo.Failure()
         collectVisitor.visit(targetMethod)
         val result = collectVisitor.result
@@ -150,14 +222,15 @@ class AtResolver(
 
         // Then attempt to find the corresponding source elements using the navigation visitor
         val targetElement = targetMethod.findSourceElement(
-            targetClass,
+            getTargetClass(target),
             at.project,
             GlobalSearchScope.allScope(at.project),
-            canDecompile = true
+            canDecompile = true,
         ) ?: return emptyList()
         val targetPsiClass = targetElement.parentOfType<PsiClass>() ?: return emptyList()
 
         val navigationVisitor = injectionPoint.createNavigationVisitor(at, target, targetPsiClass) ?: return emptyList()
+        navigationVisitor.configureBytecodeTarget(targetClass, targetMethod)
         targetElement.accept(navigationVisitor)
 
         return bytecodeResults.mapNotNull { bytecodeResult ->
@@ -172,15 +245,22 @@ class AtResolver(
 
         // Collect all possible targets
         fun <T : PsiElement> doCollectVariants(injectionPoint: InjectionPoint<T>): List<Any> {
-            val visitor = injectionPoint.createCollectVisitor(at, target, targetClass, CollectVisitor.Mode.COMPLETION)
+            val visitor = injectionPoint.createCollectVisitor(
+                at, target, getTargetClass(target),
+                CollectVisitor.Mode.COMPLETION
+            )
                 ?: return emptyList()
             visitor.visit(targetMethod)
             return visitor.result
                 .mapNotNull { result ->
-                    injectionPoint.createLookup(targetClass, result)?.let { completionHandler(it) }
+                    injectionPoint.createLookup(getTargetClass(target), result)?.let { completionHandler(it) }
                 }
         }
         return doCollectVariants(injectionPoint)
+    }
+
+    private fun getTargetClass(selector: MixinSelector?): ClassNode {
+        return selector?.getCustomOwner(targetClass) ?: targetClass
     }
 }
 

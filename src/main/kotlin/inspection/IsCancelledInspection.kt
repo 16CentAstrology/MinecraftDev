@@ -1,15 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.inspection
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.facet.MinecraftFacet
 import com.demonwav.mcdev.util.mapFirstNotNull
 import com.intellij.openapi.module.ModuleUtilCore
@@ -21,9 +32,9 @@ import org.jetbrains.annotations.Nls
 
 class IsCancelledInspection : BaseInspection() {
     @Nls
-    override fun getDisplayName() = "Useless event isCancelled check"
+    override fun getDisplayName() = MCDevBundle("inspection.is_cancelled.name")
 
-    override fun getStaticDescription(): String = "Reports useless event cancellation checks"
+    override fun getStaticDescription(): String = MCDevBundle("inspection.is_cancelled.description")
 
     override fun buildErrorString(vararg infos: Any): String {
         val useless = infos[0] as IsCancelled

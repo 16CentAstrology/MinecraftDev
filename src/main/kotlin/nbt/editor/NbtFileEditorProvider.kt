@@ -1,72 +1,69 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.nbt.editor
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.nbt.NbtVirtualFile
 import com.demonwav.mcdev.nbt.filetype.NbtFileType
-import com.demonwav.mcdev.nbt.lang.NbttFile
-import com.demonwav.mcdev.util.invokeAndWait
-import com.demonwav.mcdev.util.invokeLater
+import com.demonwav.mcdev.nbt.lang.NbttFileType
 import com.intellij.ide.actions.SaveAllAction
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.AnActionResult
 import com.intellij.openapi.actionSystem.ex.AnActionListener
-import com.intellij.openapi.application.runReadAction
-import com.intellij.openapi.command.UndoConfirmationPolicy
-import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.fileEditor.FileEditorState
-import com.intellij.openapi.fileEditor.FileEditorStateLevel
 import com.intellij.openapi.fileEditor.impl.NonProjectFileWritingAccessProvider
-import com.intellij.openapi.fileEditor.impl.text.PsiAwareTextEditorProvider
-import com.intellij.openapi.fileEditor.impl.text.TextEditorState
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.PsiManager
-import com.intellij.psi.codeStyle.CodeStyleManager
-import com.intellij.ui.components.JBLoadingPanel
-import com.intellij.util.IncorrectOperationException
-import java.awt.BorderLayout
+import com.intellij.ui.EditorNotifications
 import java.beans.PropertyChangeListener
-import javax.swing.JPanel
-import org.jetbrains.concurrency.runAsync
 
-class NbtFileEditorProvider : PsiAwareTextEditorProvider(), DumbAware {
+class NbtFileEditorProvider : AsyncFileEditorProvider, DumbAware {
     override fun getEditorTypeId() = EDITOR_TYPE_ID
     override fun accept(project: Project, file: VirtualFile) = file.fileType == NbtFileType
-    override fun getPolicy() = FileEditorPolicy.NONE
+    override fun getPolicy() = FileEditorPolicy.HIDE_DEFAULT_EDITOR
+    override fun createEditorAsync(project: Project, file: VirtualFile): AsyncFileEditorProvider.Builder {
+        val nbtFile = NbtVirtualFile(file, project)
+
+        val allowWrite = NonProjectFileWritingAccessProvider.isWriteAccessAllowed(nbtFile, project)
+        if (allowWrite) {
+            NonProjectFileWritingAccessProvider.allowWriting(listOf(nbtFile))
+        }
+
+        return NbtEditorBuilder(project, nbtFile)
+    }
+
     override fun createEditor(project: Project, file: VirtualFile): FileEditor {
-        val fileEditor = NbtFileEditor(file) { nbtFile ->
-            invokeAndWait {
-                super.createEditor(project, nbtFile)
-            }
-        }
-
-        runAsync {
-            val nbtFile = NbtVirtualFile(file, project)
-
-            if (NonProjectFileWritingAccessProvider.isWriteAccessAllowed(file, project)) {
-                NonProjectFileWritingAccessProvider.allowWriting(listOf(nbtFile))
-            }
-
-            fileEditor.ready(nbtFile, project)
-        }
-
-        return fileEditor
+        val nbtFile = NbtVirtualFile(file, project)
+        return NbtEditorBuilder(project, nbtFile).build()
     }
 
     companion object {
@@ -74,62 +71,27 @@ class NbtFileEditorProvider : PsiAwareTextEditorProvider(), DumbAware {
     }
 }
 
+private class NbtEditorBuilder(val project: Project, val nbtFile: NbtVirtualFile) : AsyncFileEditorProvider.Builder() {
+    override fun build(): FileEditor {
+        val document = FileDocumentManager.getInstance().getDocument(nbtFile)!!
+        val backingEditor = EditorFactory.getInstance().createEditor(document, project, NbttFileType, false)
+        val fileEditor = NbtFileEditor(nbtFile, backingEditor, project)
+        return fileEditor
+    }
+}
+
 private class NbtFileEditor(
-    private val file: VirtualFile,
-    private val editorProvider: (NbtVirtualFile) -> FileEditor
+    private val file: NbtVirtualFile,
+    private val editor: Editor,
+    project: Project,
 ) : FileEditor {
 
-    private var editor: FileEditor? = null
-    private val editorCheckedDisposable = Disposer.newCheckedDisposable()
-    private val component = JPanel(BorderLayout())
-
     init {
-        val loading = JBLoadingPanel(null, this)
-        loading.setLoadingText("Parsing NBT file")
-        loading.startLoading()
-        component.add(loading, BorderLayout.CENTER)
-    }
-
-    fun ready(nbtFile: NbtVirtualFile, project: Project) {
-        if (project.isDisposed) {
-            return
-        }
-
-        component.removeAll()
-
-        val toolbar = NbtToolbar(nbtFile)
-        nbtFile.toolbar = toolbar
-        editor = invokeAndWait {
-            editorProvider(nbtFile)
-        }
-        editor?.let { editor ->
-            try {
-                Disposer.register(this, editor)
-                Disposer.register(editor, editorCheckedDisposable)
-            } catch (e: IncorrectOperationException) {
-                // The editor can be disposed really quickly when opening a large number of NBT files
-                // Since everything happens basically at the same time, calling Disposer.isDisposed right before
-                // returns false but #dispose throws this IOE...
-                Disposer.dispose(this)
-                return@let
-            }
-            invokeLater {
-                component.add(toolbar.panel, BorderLayout.NORTH)
-                component.add(editor.component, BorderLayout.CENTER)
-            }
-        }
-
-        // This can be null if the file is too big to be parsed as a psi file
-        val psiFile = runReadAction {
-            PsiManager.getInstance(project).findFile(nbtFile) as? NbttFile
-        } ?: return
-
-        WriteCommandAction.writeCommandAction(psiFile)
-            .shouldRecordActionForActiveDocument(false)
-            .withUndoConfirmationPolicy(UndoConfirmationPolicy.DO_NOT_REQUEST_CONFIRMATION)
-            .run<Throwable> {
-                CodeStyleManager.getInstance(project).reformat(psiFile, true)
-            }
+        val toolbar = NbtToolbar(file)
+        file.toolbar = toolbar
+        (editor as? EditorEx)?.permanentHeaderComponent = toolbar.panel
+        editor.headerComponent = toolbar.panel
+        EditorNotifications.getInstance(project).updateAllNotifications()
 
         project.messageBus.connect(this).subscribe(
             AnActionListener.TOPIC,
@@ -145,60 +107,34 @@ private class NbtFileEditor(
                         return
                     }
 
-                    nbtFile.writeFile(this)
+                    file.writeFile(this)
                 }
-            }
+            },
         )
     }
 
-    override fun isModified() = editor.exec { isModified } ?: false
-    override fun addPropertyChangeListener(listener: PropertyChangeListener) {
-        editor.exec { addPropertyChangeListener(listener) }
+    override fun isModified() = false
+    override fun addPropertyChangeListener(listener: PropertyChangeListener) = Unit
+
+    override fun getName() = MCDevBundle("nbt.editor.name")
+    override fun setState(state: FileEditorState) = Unit
+
+    override fun getFile(): VirtualFile = file
+
+    override fun getComponent() = editor.component
+    override fun getPreferredFocusedComponent() = null
+    override fun <T : Any?> getUserData(key: Key<T>): T? = editor.getUserData(key)
+
+    override fun <T : Any?> putUserData(key: Key<T>, value: T?) = editor.putUserData(key, value)
+
+    override fun isValid() = true
+    override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
+
+    override fun dispose() {
+        EditorFactory.getInstance().releaseEditor(editor)
     }
 
-    override fun getName() = editor.exec { name } ?: ""
-    override fun setState(state: FileEditorState) {
-        editor.exec { setState(state) }
-    }
-
-    override fun getState(level: FileEditorStateLevel): FileEditorState = editor.exec { getState(level) }
-        ?: TextEditorState()
-
-    override fun getFile(): VirtualFile = editor.exec { file } ?: file
-
-    override fun getComponent() = component
-    override fun getPreferredFocusedComponent() = editor.exec { preferredFocusedComponent }
-    override fun <T : Any?> getUserData(key: Key<T>) = editor.exec { getUserData(key) }
-    override fun selectNotify() {
-        editor.exec { selectNotify() }
-    }
-
-    override fun <T : Any?> putUserData(key: Key<T>, value: T?) {
-        editor.exec { putUserData(key, value) }
-    }
-
-    override fun getCurrentLocation() = editor.exec { currentLocation }
-    override fun deselectNotify() {
-        editor.exec { deselectNotify() }
-    }
-
-    override fun getBackgroundHighlighter() = editor.exec { backgroundHighlighter }
-    override fun isValid() = editor.exec { isValid } ?: true
-    override fun removePropertyChangeListener(listener: PropertyChangeListener) {
-        editor.exec { removePropertyChangeListener(listener) }
-    }
-
-    override fun dispose() {}
-
-    override fun getStructureViewBuilder() = editor.exec { structureViewBuilder }
     override fun equals(other: Any?) = other is NbtFileEditor && other.component == this.component
     override fun hashCode() = editor.hashCode()
     override fun toString() = editor.toString()
-
-    private inline fun <T : Any?> FileEditor?.exec(action: FileEditor.() -> T): T? {
-        if (editor == null || editorCheckedDisposable.isDisposed) {
-            return null
-        }
-        return this?.action()
-    }
 }

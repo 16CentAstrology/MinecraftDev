@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.handlers
@@ -14,6 +24,7 @@ import com.demonwav.mcdev.platform.mixin.handlers.injectionPoint.InsnResolutionI
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants
 import com.demonwav.mcdev.platform.mixin.util.MixinTargetMember
 import com.demonwav.mcdev.platform.mixin.util.mixinTargets
+import com.demonwav.mcdev.util.cached
 import com.demonwav.mcdev.util.findAnnotation
 import com.demonwav.mcdev.util.findContainingClass
 import com.demonwav.mcdev.util.resolveClass
@@ -35,9 +46,9 @@ import com.intellij.util.xmlb.annotations.Attribute
 import org.objectweb.asm.tree.ClassNode
 
 interface MixinAnnotationHandler {
-    fun resolveTarget(annotation: PsiAnnotation): List<MixinTargetMember> {
-        val containingClass = annotation.findContainingClass() ?: return emptyList()
-        return containingClass.mixinTargets.flatMap { resolveTarget(annotation, it) }
+    fun resolveTarget(annotation: PsiAnnotation) = annotation.cached(PsiModificationTracker.MODIFICATION_COUNT) {
+        val containingClass = annotation.findContainingClass() ?: return@cached emptyList()
+        containingClass.mixinTargets.flatMap { resolveTarget(annotation, it) }
     }
 
     fun resolveTarget(annotation: PsiAnnotation, targetClass: ClassNode): List<MixinTargetMember>
@@ -74,7 +85,7 @@ interface MixinAnnotationHandler {
 
     companion object {
         private val EP_NAME = ExtensionPointName<KeyedLazyInstance<MixinAnnotationHandler>>(
-            "com.demonwav.minecraft-dev.mixinAnnotationHandler"
+            "com.demonwav.minecraft-dev.mixinAnnotationHandler",
         )
         private val COLLECTOR = KeyedExtensionCollector<MixinAnnotationHandler, String>(EP_NAME)
 
@@ -94,7 +105,7 @@ interface MixinAnnotationHandler {
                         ?.let { annotationType ->
                             AnnotatedElementsSearch.searchPsiClasses(
                                 annotationType,
-                                GlobalSearchScope.allScope(project)
+                                GlobalSearchScope.allScope(project),
                             ).mapNotNull { injectionInfoClass ->
                                 injectionInfoClass.findAnnotation(MixinConstants.Annotations.ANNOTATION_TYPE)
                                     ?.findAttributeValue("value")

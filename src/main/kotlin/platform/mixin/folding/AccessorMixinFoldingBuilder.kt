@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.folding
@@ -29,8 +39,8 @@ import com.intellij.psi.PsiIdentifier
 import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.PsiMethodCallExpression
 import com.intellij.psi.PsiParenthesizedExpression
-import com.intellij.psi.PsiType
 import com.intellij.psi.PsiTypeCastExpression
+import com.intellij.psi.PsiTypes
 import com.intellij.psi.util.elementType
 import com.intellij.psi.util.parentOfType
 
@@ -83,7 +93,7 @@ class AccessorMixinFoldingBuilder : CustomFoldingBuilder() {
         if (method.hasAnnotation(ACCESSOR)) {
             val name = AccessorHandler.getInstance()?.findAccessorTargetForReference(method)?.element?.name
                 ?: return null
-            return if (method.returnType == PsiType.VOID) {
+            return if (method.returnType == PsiTypes.voidType()) {
                 "$name = "
             } else {
                 name
@@ -102,7 +112,7 @@ class AccessorMixinFoldingBuilder : CustomFoldingBuilder() {
         descriptors: MutableList<FoldingDescriptor>,
         root: PsiElement,
         document: Document,
-        quick: Boolean
+        quick: Boolean,
     ) {
         if (root !is PsiJavaFile || !MixinModuleType.isInModule(root)) {
             return
@@ -146,8 +156,8 @@ class AccessorMixinFoldingBuilder : CustomFoldingBuilder() {
                 descriptors.add(
                     FoldingDescriptor(
                         identifier.node,
-                        identifier.textRange
-                    )
+                        identifier.textRange,
+                    ),
                 )
             }
 
@@ -174,15 +184,15 @@ class AccessorMixinFoldingBuilder : CustomFoldingBuilder() {
                 descriptors.add(
                     FoldingDescriptor(
                         parenthetical.node,
-                        parenthetical.textRange
-                    )
+                        parenthetical.textRange,
+                    ),
                 )
             }
         }
 
         private fun foldAccessorMethodCall(
             expression: PsiMethodCallExpression,
-            identifier: PsiIdentifier
+            identifier: PsiIdentifier,
         ) {
             val argumentList = expression.argumentList
             val openParen = argumentList.firstChild
@@ -202,23 +212,23 @@ class AccessorMixinFoldingBuilder : CustomFoldingBuilder() {
                 FoldingDescriptor(
                     openParen.node,
                     openParen.textRange,
-                    group
-                )
+                    group,
+                ),
             )
             descriptors.add(
                 FoldingDescriptor(
                     closeParen.node,
                     closeParen.textRange,
-                    group
-                )
+                    group,
+                ),
             )
 
             descriptors.add(
                 FoldingDescriptor(
                     identifier.node,
                     identifier.textRange,
-                    group
-                )
+                    group,
+                ),
             )
         }
     }

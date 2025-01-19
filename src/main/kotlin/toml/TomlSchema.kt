@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.toml
@@ -26,14 +36,20 @@ import org.toml.lang.psi.TomlTable
 // https://github.com/intellij-rust/intellij-rust/blob/42d0981d45e8830aa5efe82c45688bab8223201c/toml/src/main/kotlin/org/rust/toml/completion/RsTomlKeysCompletionProvider.kt
 class TomlSchema private constructor(
     val topLevelEntries: Set<TomlSchemaEntry>,
-    private val tables: List<TomlTableSchema>
+    private val tables: List<TomlTableSchema>,
 ) {
 
     fun topLevelKeys(isArray: Boolean): Set<String> =
         tables.filter { it.isArray == isArray }.mapTo(mutableSetOf()) { it.name }
 
+    fun topLevelEntries(isArray: Boolean): Set<TomlSchemaEntry> =
+        tables.filter { it.isArray == isArray }.flatMapTo(mutableSetOf()) { it.entries }
+
     fun keysForTable(tableName: String): Set<String> =
         tableSchema(tableName)?.entries?.mapTo(mutableSetOf()) { it.key }.orEmpty()
+
+    fun entriesForTable(tableName: String): Set<TomlSchemaEntry> =
+        tableSchema(tableName)?.entries.orEmpty()
 
     fun tableEntry(tableName: String, key: String): TomlSchemaEntry? =
         tableSchema(tableName)?.entries?.find { it.key == key }
@@ -88,12 +104,12 @@ private fun TomlElement.getComments(): List<String> {
 data class TomlSchemaEntry(
     val key: String,
     val description: List<String>,
-    val type: TomlValueType?
+    val type: TomlValueType?,
 )
 
 class TomlTableSchema(
     val name: String,
     val isArray: Boolean,
     val entries: Set<TomlSchemaEntry>,
-    val description: List<String>
+    val description: List<String>,
 )

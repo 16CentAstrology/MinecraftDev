@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.inspection.reference
@@ -36,8 +46,7 @@ class UnresolvedReferenceInspection : MixinInspection() {
     private class Visitor(private val holder: ProblemsHolder) : JavaElementVisitor() {
 
         override fun visitNameValuePair(pair: PsiNameValuePair) {
-            val name = pair.name ?: PsiAnnotation.DEFAULT_REFERENCED_METHOD_NAME
-            val resolvers: Array<MixinReference> = when (name) {
+            val resolvers: Array<MixinReference> = when (pair.name ?: PsiAnnotation.DEFAULT_REFERENCED_METHOD_NAME) {
                 "method" -> arrayOf(MethodReference)
                 "target" -> arrayOf(TargetReference)
                 "value" -> arrayOf(InjectionPointReference, DescReference)
@@ -63,7 +72,7 @@ class UnresolvedReferenceInspection : MixinInspection() {
                 holder.registerProblem(
                     value,
                     "Cannot resolve ${resolver.description}".format(value.constantStringValue),
-                    ProblemHighlightType.LIKE_UNKNOWN_SYMBOL
+                    ProblemHighlightType.LIKE_UNKNOWN_SYMBOL,
                 )
             }
         }

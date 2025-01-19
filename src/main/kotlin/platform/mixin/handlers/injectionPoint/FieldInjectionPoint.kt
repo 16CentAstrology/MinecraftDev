@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.handlers.injectionPoint
@@ -19,15 +29,18 @@ import com.demonwav.mcdev.util.constantValue
 import com.demonwav.mcdev.util.getQualifiedMemberReference
 import com.intellij.codeInsight.completion.JavaLookupElementBuilder
 import com.intellij.codeInsight.lookup.LookupElementBuilder
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiArrayAccessExpression
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiField
+import com.intellij.psi.PsiLiteral
 import com.intellij.psi.PsiMethodReferenceExpression
 import com.intellij.psi.PsiModifier
 import com.intellij.psi.PsiReferenceExpression
 import com.intellij.psi.util.PsiUtil
+import com.intellij.util.ArrayUtilRt
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
 import org.objectweb.asm.tree.AbstractInsnNode
@@ -38,7 +51,23 @@ import org.objectweb.asm.tree.MethodNode
 class FieldInjectionPoint : QualifiedInjectionPoint<PsiField>() {
     companion object {
         private val VALID_OPCODES = setOf(Opcodes.GETFIELD, Opcodes.GETSTATIC, Opcodes.PUTFIELD, Opcodes.PUTSTATIC)
+        private val ARGS_KEYS = arrayOf("array")
+        private val ARRAY_VALUES = arrayOf<Any>("length", "get", "set")
     }
+
+    override fun onCompleted(editor: Editor, reference: PsiLiteral) {
+        completeExtraStringAtAttribute(editor, reference, "target")
+    }
+
+    override fun isShiftDiscouraged(shift: Int): Boolean {
+        // allow shift after the field access
+        return shift != 0 && shift != 1
+    }
+
+    override fun getArgsKeys(at: PsiAnnotation) = ARGS_KEYS
+
+    override fun getArgsValues(at: PsiAnnotation, key: String): Array<Any> =
+        ARRAY_VALUES.takeIf { key == "array" } ?: ArrayUtilRt.EMPTY_OBJECT_ARRAY
 
     private fun getArrayAccessType(args: Map<String, String>): ArrayAccessType? {
         return when (args["array"]) {
@@ -52,7 +81,7 @@ class FieldInjectionPoint : QualifiedInjectionPoint<PsiField>() {
     override fun createNavigationVisitor(
         at: PsiAnnotation,
         target: MixinSelector?,
-        targetClass: PsiClass
+        targetClass: PsiClass,
     ): NavigationVisitor? {
         val opcode = (at.findDeclaredAttributeValue("opcode")?.constantValue as? Int)
             ?.takeIf { it in VALID_OPCODES } ?: -1
@@ -65,7 +94,7 @@ class FieldInjectionPoint : QualifiedInjectionPoint<PsiField>() {
         at: PsiAnnotation,
         target: MixinSelector?,
         targetClass: ClassNode,
-        mode: CollectVisitor.Mode
+        mode: CollectVisitor.Mode,
     ): CollectVisitor<PsiField>? {
         if (mode == CollectVisitor.Mode.COMPLETION) {
             return MyCollectVisitor(mode, at.project, MemberReference(""), -1, null, 8)
@@ -82,7 +111,7 @@ class FieldInjectionPoint : QualifiedInjectionPoint<PsiField>() {
         return JavaLookupElementBuilder.forField(
             m,
             m.getQualifiedMemberReference(owner).toMixinString(),
-            null
+            null,
         )
             .setBoldIfInClass(m, targetClass)
             .withPresentableText(m.name)
@@ -93,7 +122,7 @@ class FieldInjectionPoint : QualifiedInjectionPoint<PsiField>() {
         private val targetClass: PsiClass,
         private val selector: MixinSelector,
         private val opcode: Int,
-        private val arrayAccess: ArrayAccessType?
+        private val arrayAccess: ArrayAccessType?,
     ) : NavigationVisitor() {
         override fun visitReferenceExpression(expression: PsiReferenceExpression) {
             if (expression !is PsiMethodReferenceExpression) {
@@ -103,7 +132,7 @@ class FieldInjectionPoint : QualifiedInjectionPoint<PsiField>() {
                     (expression.resolve() as? PsiField)?.let { resolved ->
                         var matches = selector.matchField(
                             resolved,
-                            QualifiedMember.resolveQualifier(expression) ?: targetClass
+                            QualifiedMember.resolveQualifier(expression) ?: targetClass,
                         )
                         if (matches && opcode != -1) {
                             // check if we match the opcode
@@ -142,6 +171,14 @@ class FieldInjectionPoint : QualifiedInjectionPoint<PsiField>() {
                             } ?: return
 
                             addResult(actualResult)
+
+                            // if an expression is accessed for reading *and* writing, add it twice to properly handle ordinals
+                            if (opcode == -1 &&
+                                PsiUtil.isAccessedForReading(actualResult) &&
+                                PsiUtil.isAccessedForWriting(actualResult)
+                            ) {
+                                addResult(actualResult)
+                            }
                         }
                     }
                 }
@@ -157,7 +194,7 @@ class FieldInjectionPoint : QualifiedInjectionPoint<PsiField>() {
         private val selector: MixinSelector,
         private val opcode: Int,
         private val arrayAccess: ArrayAccessType?,
-        private val fuzz: Int
+        private val fuzz: Int,
     ) : CollectVisitor<PsiField>(mode) {
         override fun accept(methodNode: MethodNode) {
             val insns = methodNode.instructions ?: return
@@ -180,7 +217,7 @@ class FieldInjectionPoint : QualifiedInjectionPoint<PsiField>() {
                 val psiField = fieldNode.field.findOrConstructSourceField(
                     fieldNode.clazz,
                     project,
-                    canDecompile = false
+                    canDecompile = false,
                 )
                 addResult(actualInsn, psiField, qualifier = insn.owner.replace('/', '.'))
             }

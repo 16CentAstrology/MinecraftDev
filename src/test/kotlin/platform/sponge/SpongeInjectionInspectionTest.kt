@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.sponge
@@ -48,7 +58,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 @Inject
                 private <error descr="Primitive types cannot be injected by Sponge.">int</error> number;
             }
-            """
+            """,
         )
     }
 
@@ -67,7 +77,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 @Inject
                 private <error descr="String cannot be injected by Sponge.">String</error> string;
             }
-            """
+            """,
         )
     }
 
@@ -90,7 +100,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                     this.string = string;
                 }
             }
-            """
+            """,
         )
     }
 
@@ -114,7 +124,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                     this.logger = logger;
                 }
             }
-            """
+            """,
         )
     }
 
@@ -137,7 +147,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                     this.string = string;
                 }
             }
-            """
+            """,
         )
     }
 
@@ -157,7 +167,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 @Inject
                 private Asset <error descr="Injected Assets must be annotated with @AssetId.">asset</error>;
             }
-            """
+            """,
         )
     }
 
@@ -179,7 +189,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 @AssetId(<error descr="Asset 'absent_asset' does not exist.">"absent_asset"</error>)
                 private Asset asset;
             }
-            """
+            """,
         )
     }
 
@@ -202,7 +212,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 private Asset asset;
             }
             """,
-            "assets/a-plugin/dir/an_asset.txt"
+            "assets/a-plugin/dir/an_asset.txt",
         )
     }
 
@@ -227,7 +237,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 @DefaultConfig(sharedRoot = false)
                 private File <error descr="@ConfigDir and @DefaultConfig cannot be used on the same field.">file</error>;
             }
-            """
+            """,
         )
     }
 
@@ -248,7 +258,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 @Inject
                 private File <error descr="An injected File must be annotated with either @ConfigDir or @DefaultConfig.">file</error>;
             }
-            """
+            """,
         )
     }
 
@@ -270,7 +280,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 <error descr="Logger cannot be annotated with @DefaultConfig.">@DefaultConfig(sharedRoot = false)</error>
                 private Logger logger;
             }
-            """
+            """,
         )
     }
 
@@ -295,7 +305,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 <error descr="Injected ConfigurationLoader cannot be annotated with @ConfigDir.">@ConfigDir(sharedRoot = false)</error>
                 private ConfigurationLoader<CommentedConfigurationNode> configurationLoader;
             }
-            """
+            """,
         )
     }
 
@@ -317,7 +327,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 @Inject
                 private ConfigurationLoader<CommentedConfigurationNode> <error descr="Injected ConfigurationLoader must be annotated with @DefaultConfig.">configurationLoader</error>;
             }
-            """
+            """,
         )
     }
 
@@ -340,7 +350,7 @@ class SpongeInjectionInspectionTest : BaseSpongeTest() {
                 @DefaultConfig(sharedRoot = false)
                 private ConfigurationLoader<<error descr="Injected ConfigurationLoader generic parameter must be CommentedConfigurationNode.">ConfigurationNode</error>> configurationLoader;
             }
-            """
+            """,
         )
     }
 }

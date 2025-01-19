@@ -1,14 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.asset
+
+import com.intellij.util.IconUtil
 
 @Suppress("unused")
 object PlatformAssets : Assets() {
@@ -47,13 +59,13 @@ object PlatformAssets : Assets() {
     val VELOCITY_ICON = loadIcon("/assets/icons/platform/Velocity.png")
     val VELOCITY_ICON_2X = loadIcon("/assets/icons/platform/Velocity@2x.png")
 
-    val LITELOADER_ICON = loadIcon("/assets/icons/platform/LiteLoader.png")
-    val LITELOADER_ICON_2X = loadIcon("/assets/icons/platform/LiteLoader@2x.png")
-
     val MIXIN_ICON = loadIcon("/assets/icons/platform/Mixins.png")
     val MIXIN_ICON_2X = loadIcon("/assets/icons/platform/Mixins@2x.png")
     val MIXIN_ICON_DARK = loadIcon("/assets/icons/platform/Mixins_dark.png")
     val MIXIN_ICON_2X_DARK = loadIcon("/assets/icons/platform/Mixins@2x_dark.png")
+
+    val NEOFORGE_ICON = IconUtil.scale(loadIcon("/assets/icons/platform/NeoForge.png"), null, 0.125f)
+    val NEOFORGE_ICON_2X = IconUtil.scale(loadIcon("/assets/icons/platform/NeoForge.png"), null, 0.25f)
 
     val MCP_ICON = loadIcon("/assets/icons/platform/MCP.png")
     val MCP_ICON_2X = loadIcon("/assets/icons/platform/MCP@2x.png")

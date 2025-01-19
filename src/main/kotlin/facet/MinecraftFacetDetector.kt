@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.facet
@@ -21,21 +31,38 @@ import com.demonwav.mcdev.util.runWriteTaskLater
 import com.intellij.facet.FacetManager
 import com.intellij.facet.impl.ui.libraries.LibrariesValidatorContextImpl
 import com.intellij.framework.library.LibraryVersionProperties
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootEvent
 import com.intellij.openapi.roots.ModuleRootListener
 import com.intellij.openapi.roots.OrderRootType
+import com.intellij.openapi.roots.libraries.Library
 import com.intellij.openapi.roots.libraries.LibraryDetectionManager
+import com.intellij.openapi.roots.libraries.LibraryDetectionManager.LibraryPropertiesProcessor
 import com.intellij.openapi.roots.libraries.LibraryKind
 import com.intellij.openapi.roots.libraries.LibraryProperties
-import com.intellij.openapi.roots.ui.configuration.libraries.LibraryPresentationManager
-import com.intellij.openapi.startup.StartupActivity
+import com.intellij.openapi.roots.ui.configuration.projectRoot.LibrariesContainer
+import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.Key
+import com.intellij.platform.ide.progress.withBackgroundProgress
+import com.intellij.platform.util.progress.forEachWithProgress
+import com.intellij.util.concurrency.NonUrgentExecutor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.jetbrains.plugins.gradle.util.GradleUtil
 
-class MinecraftFacetDetector : StartupActivity {
+class MinecraftFacetDetector : ProjectActivity {
     companion object {
         private val libraryVersionsKey = Key<MutableMap<LibraryKind, String>>("mcdev.libraryVersions")
 
@@ -44,8 +71,16 @@ class MinecraftFacetDetector : StartupActivity {
         }
     }
 
-    override fun runActivity(project: Project) {
-        MinecraftModuleRootListener.doCheck(project)
+    override suspend fun execute(project: Project) {
+        val detectorService = project.service<FacetDetectorScopeProvider>()
+        MinecraftModuleRootListener.doCheckUnderProgress(project, detectorService)
+    }
+
+    @Service(Service.Level.PROJECT)
+    private class FacetDetectorScopeProvider(val scope: CoroutineScope) {
+        val dispatcher = NonUrgentExecutor.getInstance().asCoroutineDispatcher()
+        val lock = Mutex()
+        var currentJob: Job? = null
     }
 
     private object MinecraftModuleRootListener : ModuleRootListener {
@@ -55,12 +90,28 @@ class MinecraftFacetDetector : StartupActivity {
             }
 
             val project = event.source as? Project ?: return
-            doCheck(project)
+            val detectorService = project.service<FacetDetectorScopeProvider>()
+            detectorService.scope.launch(detectorService.dispatcher) {
+                doCheckUnderProgress(project, detectorService)
+            }
         }
 
-        fun doCheck(project: Project) {
+        suspend fun doCheckUnderProgress(project: Project, detectorService: FacetDetectorScopeProvider) {
+            withBackgroundProgress(project, "Detecting Minecraft Frameworks", cancellable = false) {
+                detectorService.lock.withLock {
+                    detectorService.currentJob?.cancelAndJoin()
+                    detectorService.currentJob = coroutineContext.job
+                }
+                doCheck(project)
+            }
+        }
+
+        suspend fun doCheck(project: Project) {
             val moduleManager = ModuleManager.getInstance(project)
-            for (module in moduleManager.modules) {
+
+            var needsReimport = false
+
+            moduleManager.modules.asList().forEachWithProgress { module ->
                 val facetManager = FacetManager.getInstance(module)
                 val minecraftFacet = facetManager.getFacetByType(MinecraftFacet.ID)
 
@@ -68,6 +119,15 @@ class MinecraftFacetDetector : StartupActivity {
                     checkNoFacet(module)
                 } else {
                     checkExistingFacet(module, minecraftFacet)
+                    if (ProjectReimporter.needsReimport(minecraftFacet)) {
+                        needsReimport = true
+                    }
+                }
+            }
+
+            if (needsReimport) {
+                project.service<FacetDetectorScopeProvider>().scope.launch(Dispatchers.EDT) {
+                    ProjectReimporter.reimport(project)
                 }
             }
         }
@@ -75,21 +135,23 @@ class MinecraftFacetDetector : StartupActivity {
         private fun checkNoFacet(module: Module) {
             val platforms = autoDetectTypes(module).ifEmpty { return }
 
-            val facetManager = FacetManager.getInstance(module)
-            val configuration = MinecraftFacetConfiguration()
-            configuration.state.autoDetectTypes.addAll(platforms)
-
-            val facetType = MinecraftFacet.facetTypeOrNull ?: return
-            val facet = facetManager.createFacet(facetType, "Minecraft", configuration, null)
             runWriteTaskLater {
                 // Only add the new facet if there isn't a Minecraft facet already - double check here since this
                 // task may run much later
-                if (module.isDisposed || facet.isDisposed) {
+                if (module.isDisposed) {
                     // Module may be disposed before we run
                     return@runWriteTaskLater
                 }
-                if (facetManager.getFacetByType(MinecraftFacet.ID) == null) {
-                    val model = facetManager.createModifiableModel()
+
+                val facetType = MinecraftFacet.facetTypeOrNull
+                    ?: return@runWriteTaskLater
+
+                val facetManager = FacetManager.getInstance(module)
+                val model = facetManager.createModifiableModel()
+                if (model.getFacetByType(MinecraftFacet.ID) == null) {
+                    val configuration = MinecraftFacetConfiguration()
+                    configuration.state.autoDetectTypes.addAll(platforms)
+                    val facet = facetManager.createFacet(facetType, "Minecraft", configuration, null)
                     model.addFacet(facet)
                     model.commit()
                 }
@@ -117,7 +179,6 @@ class MinecraftFacetDetector : StartupActivity {
                 ?: mutableMapOf<LibraryKind, String>().also { module.putUserData(libraryVersionsKey, it) }
             libraryVersions.clear()
 
-            val presentationManager = LibraryPresentationManager.getInstance()
             val context = LibrariesValidatorContextImpl(module)
 
             val platformKinds = mutableSetOf<LibraryKind>()
@@ -127,28 +188,12 @@ class MinecraftFacetDetector : StartupActivity {
                 .recursively()
                 .librariesOnly()
                 .forEachLibrary forEach@{ library ->
-                    MINECRAFT_LIBRARY_KINDS.forEach { kind ->
-                        if (presentationManager.isLibraryOfKind(library, context.librariesContainer, setOf(kind))) {
-                            val libraryFiles =
-                                context.librariesContainer.getLibraryFiles(library, OrderRootType.CLASSES).toList()
-                            LibraryDetectionManager.getInstance().processProperties(
-                                libraryFiles,
-                                object : LibraryDetectionManager.LibraryPropertiesProcessor {
-                                    override fun <P : LibraryProperties<*>> processProperties(
-                                        kind: LibraryKind,
-                                        properties: P
-                                    ): Boolean {
-                                        return if (properties is LibraryVersionProperties) {
-                                            libraryVersions[kind] = properties.versionString ?: return true
-                                            false
-                                        } else {
-                                            true
-                                        }
-                                    }
-                                }
-                            )
-                            platformKinds.add(kind)
+                    processLibraryMinecraftPlatformKinds(library, context.librariesContainer) { kind, version ->
+                        platformKinds.add(kind)
+                        if (version != null) {
+                            libraryVersions[kind] = version
                         }
+                        true
                     }
                     return@forEach true
                 }
@@ -163,8 +208,8 @@ class MinecraftFacetDetector : StartupActivity {
                     if (m.name.startsWith("SpongeAPI", ignoreCase = true)) {
                         // We don't want want to add parent modules in module groups
                         val moduleManager = ModuleManager.getInstance(m.project)
-                        val groupPath = moduleManager.getModuleGroupPath(m)
-                        if (groupPath == null) {
+                        val groupPath = moduleManager.getModuleGrouper(null).getGroupPath(m)
+                        if (groupPath.isEmpty()) {
                             platformKinds.add(SPONGE_LIBRARY_KIND)
                             return@forEach true
                         }
@@ -185,7 +230,25 @@ class MinecraftFacetDetector : StartupActivity {
                 platformKinds.add(ARCHITECTURY_LIBRARY_KIND)
                 platformKinds.removeIf { it == FABRIC_LIBRARY_KIND }
             }
-            return platformKinds.mapNotNull { kind -> PlatformType.fromLibraryKind(kind) }.toSet()
+            return platformKinds.mapNotNullTo(mutableSetOf()) { kind -> PlatformType.fromLibraryKind(kind) }
+        }
+
+        private fun processLibraryMinecraftPlatformKinds(
+            library: Library,
+            container: LibrariesContainer,
+            action: (kind: LibraryKind, version: String?) -> Boolean
+        ): Boolean {
+            val libraryFiles = container.getLibraryFiles(library, OrderRootType.CLASSES)
+            val propertiesProcessor = object : LibraryPropertiesProcessor {
+                override fun <P : LibraryProperties<*>> processProperties(kind: LibraryKind, properties: P): Boolean {
+                    if (kind in MINECRAFT_LIBRARY_KINDS) {
+                        val version = (properties as? LibraryVersionProperties)?.versionString
+                        return action(kind, version)
+                    }
+                    return true
+                }
+            }
+            return LibraryDetectionManager.getInstance().processProperties(libraryFiles.asList(), propertiesProcessor)
         }
     }
 }

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.handlers
@@ -25,8 +35,11 @@ import com.demonwav.mcdev.util.toJavaIdentifier
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiArrayType
+import com.intellij.psi.PsiElementFactory
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
+import com.llamalad7.mixinextras.expression.impl.point.ExpressionContext
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
 import org.objectweb.asm.tree.AbstractInsnNode
@@ -72,26 +85,28 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
     override fun expectedMethodSignature(
         annotation: PsiAnnotation,
         targetClass: ClassNode,
-        targetMethod: MethodNode
+        targetMethod: MethodNode,
     ): List<MethodSignature>? {
         val insns = resolveInstructions(annotation, targetClass, targetMethod).ifEmpty { return emptyList() }
         return getRedirectType(insns[0].insn)?.expectedMethodSignature(
             annotation,
             targetClass,
             targetMethod,
-            insns.map { it.insn }
+            insns.map { it.insn },
         )?.map { (paramGroups, returnType) ->
             // add a parameter group for capturing the target method parameters
             val extraGroup = ParameterGroup(
                 collectTargetMethodParameters(annotation.project, targetClass, targetMethod),
                 required = ParameterGroup.RequiredLevel.OPTIONAL,
-                isVarargs = true
+                isVarargs = true,
             )
             MethodSignature(paramGroups + extraGroup, returnType)
         }
     }
 
     override val allowCoerce = true
+
+    override val mixinExtrasExpressionContextType = ExpressionContext.Type.REDIRECT
 
     private interface RedirectType {
         fun isInsnAllowed(node: AbstractInsnNode) = true
@@ -100,16 +115,34 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             annotation: PsiAnnotation,
             targetClass: ClassNode,
             targetMethod: MethodNode,
-            insns: List<AbstractInsnNode>
+            insns: List<AbstractInsnNode>,
         ): List<MethodSignature>?
     }
 
-    private object FieldGet : RedirectType {
+    private abstract class FieldAccess : RedirectType {
+        protected fun determineFieldType(
+            firstMatch: FieldInsnNode,
+            annotation: PsiAnnotation,
+        ): Pair<PsiElementFactory, PsiType> {
+            val elementFactory = JavaPsiFacade.getElementFactory(annotation.project)
+
+            val sourceClassAndField = (
+                MemberReference(firstMatch.name, firstMatch.desc, firstMatch.owner.replace('/', '.'))
+                    .resolveAsm(annotation.project) as? FieldTargetMember
+                )?.classAndField
+            val fieldType = sourceClassAndField?.field?.getGenericType(sourceClassAndField.clazz, annotation.project)
+                ?: Type.getType(firstMatch.desc).toPsiType(elementFactory)
+
+            return elementFactory to fieldType
+        }
+    }
+
+    private object FieldGet : FieldAccess() {
         override fun expectedMethodSignature(
             annotation: PsiAnnotation,
             targetClass: ClassNode,
             targetMethod: MethodNode,
-            insns: List<AbstractInsnNode>
+            insns: List<AbstractInsnNode>,
         ): List<MethodSignature> {
             val firstMatch = insns.first() as FieldInsnNode
             val isValid = insns.all {
@@ -122,16 +155,9 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
                 return emptyList()
             }
 
-            val elementFactory = JavaPsiFacade.getElementFactory(annotation.project)
-
-            val sourceClassAndField = (
-                MemberReference(firstMatch.name, firstMatch.desc, firstMatch.owner.replace('/', '.'))
-                    .resolveAsm(annotation.project) as? FieldTargetMember
-                )?.classAndField
-            val fieldType = sourceClassAndField?.field?.getGenericType(sourceClassAndField.clazz, annotation.project)
-                ?: Type.getType(firstMatch.desc).toPsiType(elementFactory)
-
+            val (elementFactory, fieldType) = determineFieldType(firstMatch, annotation)
             val parameters = mutableListOf<Parameter>()
+
             if (firstMatch.opcode == Opcodes.GETFIELD) {
                 parameters += Parameter("instance", Type.getObjectType(firstMatch.owner).toPsiType(elementFactory))
             }
@@ -139,18 +165,18 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             return listOf(
                 MethodSignature(
                     listOf(ParameterGroup(parameters)),
-                    fieldType
-                )
+                    fieldType,
+                ),
             )
         }
     }
 
-    private object FieldSet : RedirectType {
+    private object FieldSet : FieldAccess() {
         override fun expectedMethodSignature(
             annotation: PsiAnnotation,
             targetClass: ClassNode,
             targetMethod: MethodNode,
-            insns: List<AbstractInsnNode>
+            insns: List<AbstractInsnNode>,
         ): List<MethodSignature> {
             val firstMatch = insns.first() as FieldInsnNode
             val isValid = insns.all {
@@ -163,16 +189,9 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
                 return emptyList()
             }
 
-            val elementFactory = JavaPsiFacade.getElementFactory(annotation.project)
-
-            val sourceClassAndField = (
-                MemberReference(firstMatch.name, firstMatch.desc, firstMatch.owner.replace('/', '.'))
-                    .resolveAsm(annotation.project) as? FieldTargetMember
-                )?.classAndField
-            val fieldType = sourceClassAndField?.field?.getGenericType(sourceClassAndField.clazz, annotation.project)
-                ?: Type.getType(firstMatch.desc).toPsiType(elementFactory)
-
+            val (elementFactory, fieldType) = determineFieldType(firstMatch, annotation)
             val parameters = mutableListOf<Parameter>()
+
             if (firstMatch.opcode == Opcodes.PUTFIELD) {
                 parameters += Parameter("instance", Type.getObjectType(firstMatch.owner).toPsiType(elementFactory))
             }
@@ -181,8 +200,8 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             return listOf(
                 MethodSignature(
                     listOf(ParameterGroup(parameters)),
-                    PsiType.VOID
-                )
+                    PsiTypes.voidType(),
+                ),
             )
         }
     }
@@ -196,7 +215,7 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             annotation: PsiAnnotation,
             targetClass: ClassNode,
             targetMethod: MethodNode,
-            insns: List<AbstractInsnNode>
+            insns: List<AbstractInsnNode>,
         ): List<MethodSignature> {
             val firstMatch = insns.first() as MethodInsnNode
             val isValid = insns.all {
@@ -219,7 +238,7 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
                 )?.classAndMethod
             val signature = sourceClassAndMethod?.method?.getGenericSignature(
                 sourceClassAndMethod.clazz,
-                annotation.project
+                annotation.project,
             )
 
             val parameters = mutableListOf<Parameter>()
@@ -252,7 +271,7 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             annotation: PsiAnnotation,
             targetClass: ClassNode,
             targetMethod: MethodNode,
-            insns: List<AbstractInsnNode>
+            insns: List<AbstractInsnNode>,
         ): List<MethodSignature>? {
             val firstMatch = insns.first()
             val isValid = insns.all { it.opcode == firstMatch.opcode }
@@ -271,12 +290,12 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
                     listOf(
                         ParameterGroup(
                             listOf(
-                                Parameter("array", arrayType.toPsiType(elementFactory))
-                            )
-                        )
+                                Parameter("array", arrayType.toPsiType(elementFactory)),
+                            ),
+                        ),
                     ),
-                    PsiType.INT
-                )
+                    PsiTypes.intType(),
+                ),
             )
         }
     }
@@ -286,7 +305,7 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             annotation: PsiAnnotation,
             targetClass: ClassNode,
             targetMethod: MethodNode,
-            insns: List<AbstractInsnNode>
+            insns: List<AbstractInsnNode>,
         ): List<MethodSignature>? {
             val firstMatch = insns.first()
             val isValid = insns.all { it.opcode == firstMatch.opcode }
@@ -307,12 +326,12 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
                         ParameterGroup(
                             listOf(
                                 Parameter("array", psiArrayType),
-                                Parameter("index", PsiType.INT)
-                            )
-                        )
+                                Parameter("index", PsiTypes.intType()),
+                            ),
+                        ),
                     ),
-                    psiArrayType.componentType
-                )
+                    psiArrayType.componentType,
+                ),
             )
         }
     }
@@ -322,7 +341,7 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             annotation: PsiAnnotation,
             targetClass: ClassNode,
             targetMethod: MethodNode,
-            insns: List<AbstractInsnNode>
+            insns: List<AbstractInsnNode>,
         ): List<MethodSignature>? {
             val firstMatch = insns.first()
             val isValid = insns.all { it.opcode == firstMatch.opcode }
@@ -343,13 +362,13 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
                         ParameterGroup(
                             listOf(
                                 Parameter("array", psiArrayType),
-                                Parameter("index", PsiType.INT),
-                                Parameter("value", psiArrayType.componentType)
-                            )
-                        )
+                                Parameter("index", PsiTypes.intType()),
+                                Parameter("value", psiArrayType.componentType),
+                            ),
+                        ),
                     ),
-                    PsiType.VOID
-                )
+                    PsiTypes.voidType(),
+                ),
             )
         }
     }
@@ -363,7 +382,7 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             annotation: PsiAnnotation,
             targetClass: ClassNode,
             targetMethod: MethodNode,
-            insns: List<AbstractInsnNode>
+            insns: List<AbstractInsnNode>,
         ): List<MethodSignature> {
             val firstMatch = insns.first() as TypeInsnNode
             val isValid = insns.all {
@@ -383,7 +402,7 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
                 targetMethod,
                 insns.mapNotNull {
                     NewInsnInjectionPoint.findInitCall(it as TypeInsnNode)
-                }
+                },
             ).map { (paramGroups, _) ->
                 // drop the instance parameter, return the constructed type
                 MethodSignature(listOf(ParameterGroup(paramGroups[0].parameters.drop(1))), constructedType)
@@ -396,7 +415,7 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             annotation: PsiAnnotation,
             targetClass: ClassNode,
             targetMethod: MethodNode,
-            insns: List<AbstractInsnNode>
+            insns: List<AbstractInsnNode>,
         ): List<MethodSignature> {
             val firstMatch = insns.first()
             val isValid = insns.all { it.opcode == firstMatch.opcode }
@@ -409,12 +428,12 @@ class RedirectInjectorHandler : InjectorAnnotationHandler() {
             val parameters = ParameterGroup(
                 listOf(
                     Parameter("instance", objectType),
-                    Parameter("type", classType)
-                )
+                    Parameter("type", classType),
+                ),
             )
             return listOf(
-                MethodSignature(listOf(parameters), PsiType.BOOLEAN),
-                MethodSignature(listOf(parameters), classType)
+                MethodSignature(listOf(parameters), PsiTypes.booleanType()),
+                MethodSignature(listOf(parameters), classType),
             )
         }
     }

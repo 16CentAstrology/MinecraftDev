@@ -1,31 +1,44 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.intentions
 
 import com.demonwav.mcdev.translations.TranslationFiles
-import com.intellij.codeInsight.intention.PsiElementBaseIntentionAction
+import com.intellij.codeInspection.LocalQuickFixAndIntentionActionOnPsiElement
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
-import com.intellij.util.IncorrectOperationException
+import com.intellij.psi.PsiFile
 
-class RemoveUnmatchedEntryIntention : PsiElementBaseIntentionAction() {
+class RemoveUnmatchedEntryIntention(element: PsiElement) : LocalQuickFixAndIntentionActionOnPsiElement(element) {
     override fun getText() = "Remove translation"
-
-    override fun isAvailable(project: Project, editor: Editor, element: PsiElement) = true
 
     override fun getFamilyName() = "Minecraft"
 
-    @Throws(IncorrectOperationException::class)
-    override fun invoke(project: Project, editor: Editor, element: PsiElement) {
-        TranslationFiles.remove(TranslationFiles.seekTranslation(element) ?: return)
+    override fun invoke(
+        project: Project,
+        file: PsiFile,
+        editor: Editor?,
+        startElement: PsiElement,
+        endElement: PsiElement
+    ) {
+        TranslationFiles.remove(TranslationFiles.seekTranslation(startElement) ?: return)
     }
 }

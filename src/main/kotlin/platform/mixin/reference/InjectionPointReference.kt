@@ -1,15 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.reference
 
+import com.demonwav.mcdev.platform.mixin.handlers.injectionPoint.InjectionPoint
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.AT
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.AT_CODE
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.SLICE
@@ -76,20 +87,31 @@ object InjectionPointReference : ReferenceResolver(), MixinReference {
     override fun collectVariants(context: PsiElement): Array<Any> {
         return (
             getAllAtCodes(context.project).keys.asSequence()
+                .filter {
+                    InjectionPoint.byAtCode(it)?.discouragedMessage == null
+                }
                 .map {
                     PrioritizedLookupElement.withPriority(
-                        LookupElementBuilder.create(it).completeToLiteral(context),
-                        1.0
+                        LookupElementBuilder.create(it).completeInjectionPoint(context),
+                        1.0,
                     )
                 } +
                 getCustomInjectionPointInheritors(context.project).asSequence()
                     .map {
                         PrioritizedLookupElement.withPriority(
-                            LookupElementBuilder.create(it).completeToLiteral(context),
-                            0.0
+                            LookupElementBuilder.create(it).completeInjectionPoint(context),
+                            0.0,
                         )
                     }
             ).toTypedArray()
+    }
+
+    private fun LookupElementBuilder.completeInjectionPoint(context: PsiElement): LookupElementBuilder {
+        val injectionPoint = InjectionPoint.byAtCode(lookupString) ?: return completeToLiteral(context)
+
+        return completeToLiteral(context) { editor, element ->
+            injectionPoint.onCompleted(editor, element)
+        }
     }
 
     private val SLICE_SELECTORS_KEY = Key<CachedValue<List<String>>>("mcdev.sliceSelectors")
@@ -103,12 +125,12 @@ object InjectionPointReference : ReferenceResolver(), MixinReference {
                     .findClass(SELECTOR, GlobalSearchScope.allScope(project))
                     ?: return@getCachedValue CachedValueProvider.Result(
                         emptyList(),
-                        PsiModificationTracker.MODIFICATION_COUNT
+                        PsiModificationTracker.MODIFICATION_COUNT,
                     )
                 val enumConstants = selectorClass.fields.mapNotNull { (it as? PsiEnumConstant)?.name }
                 CachedValueProvider.Result(enumConstants, PsiModificationTracker.MODIFICATION_COUNT)
             },
-            false
+            false,
         )
     }
 
@@ -123,7 +145,7 @@ object InjectionPointReference : ReferenceResolver(), MixinReference {
                     .findClass(INJECTION_POINT, GlobalSearchScope.allScope(project))
                     ?: return@getCachedValue CachedValueProvider.Result(
                         emptyList(),
-                        PsiModificationTracker.MODIFICATION_COUNT
+                        PsiModificationTracker.MODIFICATION_COUNT,
                     )
                 val inheritors = ClassInheritorsSearch.search(injectionPointClass).mapNotNull { c ->
                     if (c.qualifiedName == INJECTION_POINT) return@mapNotNull null
@@ -140,7 +162,7 @@ object InjectionPointReference : ReferenceResolver(), MixinReference {
                 }
                 CachedValueProvider.Result(inheritors, PsiModificationTracker.MODIFICATION_COUNT)
             },
-            false
+            false,
         )
     }
 

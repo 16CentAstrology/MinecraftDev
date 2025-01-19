@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.bungeecord.inspection
@@ -16,6 +26,7 @@ import com.demonwav.mcdev.util.extendsOrImplements
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
+import com.intellij.psi.util.createSmartPointer
 import com.siyeh.ig.BaseInspection
 import com.siyeh.ig.BaseInspectionVisitor
 import com.siyeh.ig.InspectionGadgetsFix
@@ -32,11 +43,11 @@ class BungeeCordListenerImplementedInspection : BaseInspection() {
     override fun getStaticDescription() =
         "All BungeeCord @EventHandler methods must reside in a class that implements Listener."
 
-    override fun buildFix(vararg infos: Any): InspectionGadgetsFix? {
+    override fun buildFix(vararg infos: Any): InspectionGadgetsFix {
+        val classPointer = (infos[0] as PsiClass).createSmartPointer()
         return object : InspectionGadgetsFix() {
             override fun doFix(project: Project, descriptor: ProblemDescriptor) {
-                val psiClass = infos[0] as PsiClass
-                psiClass.addImplements(BungeeCordConstants.LISTENER_CLASS)
+                classPointer.element?.addImplements(BungeeCordConstants.LISTENER_CLASS)
             }
 
             @Nls

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations
@@ -24,8 +34,11 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.FoldingGroup
 import com.intellij.openapi.options.BeanConfigurable
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiExpressionList
-import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.uast.UCallExpression
+import org.jetbrains.uast.UElement
+import org.jetbrains.uast.textRange
+import org.jetbrains.uast.toUElement
+import org.jetbrains.uast.visitor.AbstractUastVisitor
 
 class TranslationCodeFoldingOptionsProvider :
     BeanConfigurable<TranslationFoldingSettings>(TranslationFoldingSettings.instance), CodeFoldingOptionsProvider {
@@ -33,7 +46,7 @@ class TranslationCodeFoldingOptionsProvider :
         title = "Minecraft"
         checkBox(
             "Translation Strings",
-            TranslationFoldingSettings.instance::shouldFoldTranslations
+            TranslationFoldingSettings.instance::shouldFoldTranslations,
         ) {
             TranslationFoldingSettings.instance.shouldFoldTranslations = it
         }
@@ -44,7 +57,7 @@ class TranslationCodeFoldingOptionsProvider :
 class TranslationFoldingSettings : PersistentStateComponent<TranslationFoldingSettings.State> {
 
     data class State(
-        var shouldFoldTranslations: Boolean = true
+        var shouldFoldTranslations: Boolean = true,
     )
 
     private var state = State()
@@ -78,28 +91,43 @@ class TranslationFoldingBuilder : FoldingBuilderEx() {
 
         val descriptors = mutableListOf<FoldingDescriptor>()
         for (identifier in TranslationIdentifier.INSTANCES) {
-            val elements = PsiTreeUtil.findChildrenOfType(root, identifier.elementClass())
-            for (element in elements) {
+            val uElement = root.toUElement() ?: continue
+            val children = mutableListOf<UElement>()
+            uElement.accept(object : AbstractUastVisitor() {
+                override fun visitElement(node: UElement): Boolean {
+                    if (identifier.elementClass().isAssignableFrom(node.javaClass)) {
+                        children.add(node)
+                    }
+
+                    return super.visitElement(node)
+                }
+            })
+            for (element in children) {
                 val translation = identifier.identifyUnsafe(element)
                 val foldingElement = translation?.foldingElement ?: continue
                 val range =
-                    if (foldingElement is PsiExpressionList) {
-                        val args = foldingElement.expressions.drop(translation.foldStart)
-                        args.first().textRange.union(args.last().textRange)
+                    if (foldingElement is UCallExpression && translation.foldStart != 0) {
+                        val args = foldingElement.valueArguments.drop(translation.foldStart)
+                        val startRange = args.first().textRange ?: continue
+                        val endRange = args.last().textRange ?: continue
+                        startRange.union(endRange)
                     } else {
-                        foldingElement.textRange
+                        foldingElement.textRange ?: continue
                     }
+                if (!translation.required && translation.formattingError != null) {
+                    continue
+                }
                 descriptors.add(
                     FoldingDescriptor(
-                        translation.foldingElement.node,
+                        translation.foldingElement.sourcePsi?.node!!,
                         range,
                         FoldingGroup.newGroup("mc.translation." + translation.key),
                         if (translation.formattingError == TranslationInstance.Companion.FormattingError.MISSING) {
                             "\"Insufficient parameters for formatting '${translation.text}'\""
                         } else {
                             "\"${translation.text}\""
-                        }
-                    )
+                        },
+                    ),
                 )
             }
         }

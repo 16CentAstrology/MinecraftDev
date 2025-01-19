@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util
@@ -22,7 +32,13 @@ enum class License(private val displayName: String, val id: String) {
     GPL_3("GNU GPL 3.0", "GPL-3.0"),
     AGPL_3("GNU AGPL 3.0", "AGPL-3.0"),
     UNLICENSE("Unlicense", "unlicense"),
+
     ;
 
     override fun toString() = displayName
+
+    companion object {
+        private val byId = values().associateBy { it.id }
+        fun byId(id: String) = byId[id]
+    }
 }

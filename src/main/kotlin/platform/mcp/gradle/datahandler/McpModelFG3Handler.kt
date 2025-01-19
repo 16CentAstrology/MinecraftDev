@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.gradle.datahandler
@@ -24,13 +34,14 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import org.gradle.tooling.model.idea.IdeaModule
 import org.jetbrains.plugins.gradle.model.data.GradleSourceSetData
 import org.jetbrains.plugins.gradle.service.project.ProjectResolverContext
+import org.jetbrains.plugins.gradle.util.gradleIdentityPath
 
 object McpModelFG3Handler : McpModelDataHandler {
 
     override fun build(
         gradleModule: IdeaModule,
         node: DataNode<ModuleData>,
-        resolverCtx: ProjectResolverContext
+        resolverCtx: ProjectResolverContext,
     ) {
         val data = resolverCtx.getExtraProject(gradleModule, McpModelFG3::class.java) ?: return
 
@@ -55,12 +66,13 @@ object McpModelFG3Handler : McpModelDataHandler {
             data.mcpVersion,
             data.taskOutputLocation.absolutePath,
             SrgType.TSRG,
-            forgeVersion
+            forgeVersion,
         )
 
-        val gradleProjectPath = gradleModule.gradleProject.projectIdentifier.projectPath
-        val suffix = if (gradleProjectPath.endsWith(':')) "" else ":"
-        val taskName = gradleProjectPath + suffix + data.taskName
+        // gradleIdentityPath makes it work with composite builds
+        val identityPath = node.data.gradleIdentityPath
+        // But ignore it if it is the root project, as taskName already starts with a colon
+        val taskName = if (identityPath == ":") data.taskName else identityPath + ':' + data.taskName
 
         val ats = data.accessTransformers
         if (ats != null && ats.isNotEmpty()) {

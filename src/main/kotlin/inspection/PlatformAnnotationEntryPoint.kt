@@ -1,15 +1,27 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.inspection
 
+import com.demonwav.mcdev.asset.MCDevBundle
+import com.demonwav.mcdev.platform.PlatformType
 import com.intellij.codeInspection.reference.EntryPoint
 import com.intellij.codeInspection.reference.RefElement
 import com.intellij.openapi.util.InvalidDataException
@@ -18,13 +30,12 @@ import com.intellij.psi.PsiElement
 import org.jdom.Element
 
 class PlatformAnnotationEntryPoint : EntryPoint() {
-    override fun getDisplayName() = "Minecraft Entry Point"
+    override fun getDisplayName() = MCDevBundle("inspection.entry_point.name")
     override fun isEntryPoint(refElement: RefElement, psiElement: PsiElement) = false
     override fun isEntryPoint(psiElement: PsiElement) = false
     override fun isSelected() = false
     override fun setSelected(selected: Boolean) {}
-    override fun getIgnoreAnnotations() =
-        arrayOf("org.spongepowered.api.event.Listener", "org.bukkit.event.EventHandler")
+    override fun getIgnoreAnnotations() = PlatformType.entries.flatMap { it.type.ignoredAnnotations }.toTypedArray()
 
     @Throws(InvalidDataException::class)
     override fun readExternal(element: Element) {

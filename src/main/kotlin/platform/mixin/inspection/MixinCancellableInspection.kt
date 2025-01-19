@@ -1,19 +1,31 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.inspection
 
+import com.demonwav.mcdev.platform.mixin.inspection.injector.CancellableBeforeSuperCallInspection
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.INJECT
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Classes.CALLBACK_INFO
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Classes.CALLBACK_INFO_RETURNABLE
 import com.demonwav.mcdev.util.fullQualifiedName
+import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.LocalQuickFixAndIntentionActionOnPsiElement
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
@@ -73,18 +85,23 @@ class MixinCancellableInspection : MixinInspection() {
             }
 
             if (definitelyUsesCancel && !isCancellable) {
+                val fixes = mutableListOf<LocalQuickFix>()
+                if (!CancellableBeforeSuperCallInspection.doesInjectBeforeSuperConstructorCall(injectAnnotation)) {
+                    fixes += MakeInjectCancellableFix(injectAnnotation)
+                }
+
                 holder.registerProblem(
                     method.nameIdentifier ?: method,
                     "@Inject must be marked as cancellable in order to be cancelled",
                     ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
-                    MakeInjectCancellableFix(injectAnnotation)
+                    *fixes.toTypedArray(),
                 )
             } else if (!definitelyUsesCancel && !mayUseCancel && isCancellable) {
                 holder.registerProblem(
                     cancellableAttribute.parent,
                     "@Inject is cancellable but is never cancelled",
                     ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
-                    RemoveInjectCancellableFix(injectAnnotation)
+                    RemoveInjectCancellableFix(injectAnnotation),
                 )
             }
         }
@@ -102,7 +119,7 @@ class MixinCancellableInspection : MixinInspection() {
             file: PsiFile,
             editor: Editor?,
             startElement: PsiElement,
-            endElement: PsiElement
+            endElement: PsiElement,
         ) {
             val annotation = startElement as PsiAnnotation
             val value = PsiElementFactory.getInstance(project).createExpressionFromText("true", annotation)
@@ -110,10 +127,10 @@ class MixinCancellableInspection : MixinInspection() {
         }
     }
 
-    private class RemoveInjectCancellableFix(element: PsiAnnotation) :
+    class RemoveInjectCancellableFix(element: PsiAnnotation) :
         LocalQuickFixAndIntentionActionOnPsiElement(element) {
 
-        override fun getFamilyName(): String = "Remove unused cancellable attribute"
+        override fun getFamilyName(): String = "Remove cancellable attribute"
 
         override fun getText(): String = familyName
 
@@ -122,7 +139,7 @@ class MixinCancellableInspection : MixinInspection() {
             file: PsiFile,
             editor: Editor?,
             startElement: PsiElement,
-            endElement: PsiElement
+            endElement: PsiElement,
         ) {
             val annotation = startElement as PsiAnnotation
             annotation.setDeclaredAttributeValue("cancellable", null)

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.handlers
@@ -20,6 +30,7 @@ import com.demonwav.mcdev.util.descriptor
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiMethod
+import com.llamalad7.mixinextras.expression.impl.point.ExpressionContext
 import org.objectweb.asm.Type
 import org.objectweb.asm.tree.AbstractInsnNode
 import org.objectweb.asm.tree.ClassNode
@@ -34,7 +45,7 @@ class ModifyArgHandler : InjectorAnnotationHandler() {
     override fun expectedMethodSignature(
         annotation: PsiAnnotation,
         targetClass: ClassNode,
-        targetMethod: MethodNode
+        targetMethod: MethodNode,
     ): List<MethodSignature>? {
         val index = annotation.findDeclaredAttributeValue("index")?.constantValue as? Int
         val validSingleArgTypes = mutableSetOf<String>()
@@ -59,7 +70,7 @@ class ModifyArgHandler : InjectorAnnotationHandler() {
                 if (validSingleArgTypes.isEmpty()) {
                     validSingleArgTypes.addAll(validArgTypes)
                 } else {
-                    validSingleArgTypes.retainAll(validArgTypes)
+                    validSingleArgTypes.retainAll(validArgTypes.toSet())
                     if (validSingleArgTypes.isEmpty()) {
                         return listOf()
                     }
@@ -100,11 +111,11 @@ class ModifyArgHandler : InjectorAnnotationHandler() {
                 listOf(
                     ParameterGroup(
                         listOf(
-                            sanitizedParameter(psiType, psiParameter?.name)
-                        )
-                    )
+                            sanitizedParameter(psiType, psiParameter?.name),
+                        ),
+                    ),
                 ),
-                psiType
+                psiType,
             )
             if (validFullSignature != null) {
                 val fullParamGroup = ParameterGroup(
@@ -112,17 +123,19 @@ class ModifyArgHandler : InjectorAnnotationHandler() {
                         val psiParam = paramList?.let { bytecodeMethod.getParameter(bytecodeClass, index, it) }
                         sanitizedParameter(
                             psiParam?.type ?: argType.toPsiType(elementFactory),
-                            psiParam?.name
+                            psiParam?.name,
                         )
-                    }
+                    },
                 )
                 listOf(
                     singleSignature,
-                    MethodSignature(listOf(fullParamGroup), psiType)
+                    MethodSignature(listOf(fullParamGroup), psiType),
                 )
             } else {
                 listOf(singleSignature)
             }
         }
     }
+
+    override val mixinExtrasExpressionContextType = ExpressionContext.Type.MODIFY_ARG
 }

@@ -9,23 +9,23 @@ Minecraft Development for IntelliJ
     </tr>
     <tr>
         <td align="right"><b>Main Build</b></td>
-        <td colspan="2"><a href="https://ci.denwav.dev/viewType.html?buildTypeId=MinecraftDev_Build"><img src="https://ci.denwav.dev/app/rest/builds/buildType:(id:MinecraftDev_Build)/statusIcon.svg" alt="Teamcity Build Status" /></a></td>
+        <td colspan="2"><a href="https://ci.mcdev.io/viewType.html?buildTypeId=MinecraftDev_Build"><img src="https://ci.mcdev.io/app/rest/builds/buildType:(id:MinecraftDev_Build)/statusIcon.svg" alt="Teamcity Build Status" /></a></td>
     </tr>
     <tr>
-        <td align="left">2022.1</td>
-        <td align="left"><a href="https://ci.denwav.dev/viewType.html?buildTypeId=MinecraftDev_Nightly_20221"><img src="https://ci.denwav.dev/app/rest/builds/buildType:(id:MinecraftDev_Nightly_20221)/statusIcon.svg" alt="2022.1 Nightly Status" /></a></td>
+        <td align="left">2024.1</td>
+        <td align="left"><a href="https://ci.mcdev.io/viewType.html?buildTypeId=MinecraftDev_Nightly_20241"><img src="https://ci.mcdev.io/app/rest/builds/buildType:(id:MinecraftDev_Nightly_20241)/statusIcon.svg" alt="2024.1 Nightly Status" /></a></td>
     </tr>
     <tr>
-        <td align="left">2022.2</td>
-        <td align="left"><a href="https://ci.denwav.dev/viewType.html?buildTypeId=MinecraftDev_Nightly_20222"><img src="https://ci.denwav.dev/app/rest/builds/buildType:(id:MinecraftDev_Nightly_20222)/statusIcon.svg" alt="2022.2 Nightly Status" /></a></td>
+        <td align="left">2024.2</td>
+        <td align="left"><a href="https://ci.mcdev.io/viewType.html?buildTypeId=MinecraftDev_Nightly_20242"><img src="https://ci.mcdev.io/app/rest/builds/buildType:(id:MinecraftDev_Nightly_20242)/statusIcon.svg" alt="2024.2 Nightly Status" /></a></td>
     </tr>
     <tr>
-        <td align="left">2022.3</td>
-        <td align="left"><a href="https://ci.denwav.dev/viewType.html?buildTypeId=MinecraftDev_Nightly_20223"><img src="https://ci.denwav.dev/app/rest/builds/buildType:(id:MinecraftDev_Nightly_20223)/statusIcon.svg" alt="2022.3 Nightly Status" /></a></td>
+        <td align="left">2024.3</td>
+        <td align="left"><a href="https://ci.mcdev.io/viewType.html?buildTypeId=MinecraftDev_Nightly_20243"><img src="https://ci.mcdev.io/app/rest/builds/buildType:(id:MinecraftDev_Nightly_20243)/statusIcon.svg" alt="2024.3 Nightly Status" /></a></td>
     </tr>
     <tr>
-        <td align="left">2023.1</td>
-        <td align="left"><a href="https://ci.denwav.dev/viewType.html?buildTypeId=MinecraftDev_Nightly_20231"><img src="https://ci.denwav.dev/app/rest/builds/buildType:(id:MinecraftDev_Nightly_20231)/statusIcon.svg" alt="2023.1 Nightly Status" /></a></td>
+        <td align="left">2025.1</td>
+        <td align="left"><a href="https://ci.mcdev.io/viewType.html?buildTypeId=MinecraftDev_Nightly_20251"><img src="https://ci.mcdev.io/app/rest/builds/buildType:(id:MinecraftDev_Nightly_20251)/statusIcon.svg" alt="2025.1 Nightly Status" /></a></td>
     </tr>
     <tr>
         <td align="right"><b>OS Tests</b></td>
@@ -35,7 +35,7 @@ Minecraft Development for IntelliJ
     </tr>
 </table>
 
-Info and Documentation [![Current Release](https://img.shields.io/badge/release-1.5.22-orange.svg?style=flat-square)](https://plugins.jetbrains.com/plugin/8327)
+Info and Documentation [![Current Release](https://img.shields.io/badge/release-1.8.1-orange.svg?style=flat-square)](https://plugins.jetbrains.com/plugin/8327)
 ----------------------
 
 <a href="https://discord.gg/j6UNcfr"><img src="https://i.imgur.com/JXu9C1G.png" height="48px"></img></a>
@@ -128,17 +128,18 @@ Developers
 License
 -------
 
-This project is licensed under [MIT](license.txt).
+This project is licensed under [LGPLv3.0-only](license.txt).
 
 Supported Platforms
 -------------------
 
-- [![Bukkit Icon](src/main/resources/assets/icons/platform/Bukkit.png?raw=true) **Bukkit**](https://hub.spigotmc.org/stash/projects/SPIGOT/repos/bukkit/browse) ([![Spigot Icon](src/main/resources/assets/icons/platform/Spigot.png?raw=true) Spigot](https://spigotmc.org/) and [![Paper Icon](src/main/resources/assets/icons/platform/Paper.png?raw=true) Paper](https://papermc.io/))
+- [![Spigot Icon](src/main/resources/assets/icons/platform/Spigot.png?raw=true) **Spigot**](https://spigotmc.org/) ([![Paper Icon](src/main/resources/assets/icons/platform/Paper.png?raw=true) Paper](https://papermc.io/))
 - [![Sponge Icon](src/main/resources/assets/icons/platform/Sponge_dark.png?raw=true) **Sponge**](https://www.spongepowered.org/)
 - [![Architectury Icon](src/main/resources/assets/icons/platform/Architectury.png?raw=true) **Architectury**](https://github.com/architectury/architectury-api)
 - [![Forge Icon](src/main/resources/assets/icons/platform/Forge.png?raw=true) **Minecraft Forge**](https://forums.minecraftforge.net/)
+- <a href="https://neoforged.net/"><img src="src/main/resources/assets/icons/platform/NeoForge.png?raw=true" width="16" height="16"/> <b>Neoforge</b><a/>
 - [![Fabric Icon](src/main/resources/assets/icons/platform/Fabric.png?raw=true) **Fabric**](https://fabricmc.net)
-- [![LiteLoader Icon](src/main/resources/assets/icons/platform/LiteLoader.png?raw=true) **LiteLoader**](http://www.liteloader.com/)
-- [![MCP Icon](src/main/resources/assets/icons/platform/MCP.png?raw=true) **MCP**](http://www.modcoderpack.com/)
 - [![Mixins Icon](src/main/resources/assets/icons/platform/Mixins_dark.png?raw=true) **Mixins**](https://github.com/SpongePowered/Mixin)
 - [![BungeeCord Icon](src/main/resources/assets/icons/platform/BungeeCord.png?raw=true) **BungeeCord**](https://www.spigotmc.org/wiki/bungeecord/) ([![Waterfall Icon](src/main/resources/assets/icons/platform/Waterfall.png?raw=true) Waterfall](https://github.com/PaperMC/Waterfall))
+- [![Velocity Icon](src/main/resources/assets/icons/platform/Velocity.png?raw=true) **Velocity**](https://velocitypowered.com/)
+- [![Adventure Icon](src/main/resources/assets/icons/platform/Adventure.png?raw=true) **Adventure**](https://kyori.net/)

@@ -1,54 +1,47 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import org.cadixdev.gradle.licenser.header.HeaderStyle
 import org.gradle.internal.jvm.Jvm
-import org.gradle.internal.os.OperatingSystem
+import org.jetbrains.changelog.Changelog
 import org.jetbrains.gradle.ext.settings
 import org.jetbrains.gradle.ext.taskTriggers
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 
 plugins {
-    kotlin("jvm") version "1.8.0"
-    java
-    mcdev
     groovy
-    idea
-    id("org.jetbrains.intellij") version "1.12.0"
-    id("org.cadixdev.licenser")
-    id("org.jlleitschuh.gradle.ktlint") version "10.3.0"
+    id(libs.plugins.changelog.get().pluginId)
+    alias(libs.plugins.idea.ext)
+    `mcdev-core`
+    `mcdev-parsing`
+    `mcdev-publishing`
 }
 
-val ideaVersionName: String by project
 val coreVersion: String by project
-val pluginTomlVersion: String by project
 
 val gradleToolingExtension: Configuration by configurations.creating
 val testLibs: Configuration by configurations.creating {
     isTransitive = false
 }
 
-group = "com.demonwav.minecraft-dev"
-version = "$ideaVersionName-$coreVersion"
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(11))
-    }
-}
-kotlin {
-    jvmToolchain {
-        languageVersion.set(java.toolchain.languageVersion.get())
-    }
-}
+group = "com.demonwav.mcdev"
 
 val gradleToolingExtensionSourceSet: SourceSet = sourceSets.create("gradle-tooling-extension") {
     configurations.named(compileOnlyConfigurationName) {
@@ -58,50 +51,82 @@ val gradleToolingExtensionSourceSet: SourceSet = sourceSets.create("gradle-tooli
 val gradleToolingExtensionJar = tasks.register<Jar>(gradleToolingExtensionSourceSet.jarTaskName) {
     from(gradleToolingExtensionSourceSet.output)
     archiveClassifier.set("gradle-tooling-extension")
+    exclude("META-INF/plugin.xml")
 }
 
-repositories {
-    maven("https://repo.denwav.dev/repository/maven-public/")
-    maven("https://maven.fabricmc.net/") {
-        content {
-            includeModule("net.fabricmc", "mapping-io")
-        }
+val templatesSourceSet: SourceSet = sourceSets.create("templates") {
+    resources {
+        srcDir("templates")
+        compileClasspath += sourceSets.main.get().output
     }
-    mavenCentral()
+}
+
+val templateSourceSets: List<SourceSet> = (file("templates").listFiles() ?: emptyArray()).mapNotNull { file ->
+    if (file.isDirectory() && (file.listFiles() ?: emptyArray()).any { it.name.endsWith(".mcdev.template.json") }) {
+        sourceSets.create("templates-${file.name}") {
+            resources {
+                srcDir(file)
+                compileClasspath += sourceSets.main.get().output
+            }
+        }
+    } else {
+        null
+    }
+}
+
+val externalAnnotationsJar = tasks.register<Jar>("externalAnnotationsJar") {
+    from("externalAnnotations")
+    destinationDirectory.set(layout.buildDirectory.dir("externalAnnotations"))
+    archiveFileName.set("externalAnnotations.jar")
 }
 
 dependencies {
     // Add tools.jar for the JDI API
     implementation(files(Jvm.current().toolsJar))
 
-    // Kotlin
-    implementation(kotlin("stdlib-jdk8"))
-    implementation(kotlin("reflect"))
-    implementation(libs.bundles.coroutines)
-
     implementation(files(gradleToolingExtensionJar))
 
-    implementation(libs.templateMakerFabric)
+    implementation(libs.mixinExtras.expressions)
+    testLibs(libs.mixinExtras.common)
+
     implementation(libs.mappingIo)
     implementation(libs.bundles.asm)
 
     implementation(libs.bundles.fuel)
 
-    jflex(libs.jflex.lib)
-    jflexSkeleton(libs.jflex.skeleton) {
-        artifact {
-            extension = "skeleton"
-        }
+    intellijPlatform {
+        intellijIdeaCommunity(libs.versions.intellij.ide)
+
+        // Bundled plugin dependencies
+        bundledPlugin("com.intellij.java")
+        bundledPlugin("org.jetbrains.idea.maven")
+        bundledPlugin("com.intellij.gradle")
+        bundledPlugin("org.intellij.groovy")
+        bundledPlugin("ByteCodeViewer")
+        bundledPlugin("org.intellij.intelliLang")
+        bundledPlugin("com.intellij.properties")
+
+        // Optional dependencies
+        bundledPlugin("org.jetbrains.kotlin")
+        bundledPlugin("org.toml.lang")
+        bundledPlugin("org.jetbrains.plugins.yaml")
+
+        testFramework(TestFrameworkType.JUnit5)
+        testFramework(TestFrameworkType.Plugin.Java)
+
+        pluginVerifier()
     }
-    grammarKit(libs.grammarKit)
 
     testLibs(libs.test.mockJdk)
     testLibs(libs.test.mixin)
+    testLibs(libs.test.spigotapi)
+    testLibs(libs.test.bungeecord)
     testLibs(libs.test.spongeapi) {
         artifact {
             classifier = "shaded"
         }
     }
+    testLibs(libs.test.fabricloader)
     testLibs(libs.test.nbt) {
         artifact {
             extension = "nbt"
@@ -114,97 +139,27 @@ dependencies {
     gradleToolingExtension(libs.groovy)
     gradleToolingExtension(libs.gradleToolingExtension)
     gradleToolingExtension(libs.annotations)
-
-    testImplementation(libs.junit.api)
-    testRuntimeOnly(libs.junit.entine)
-    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
-val artifactType = Attribute.of("artifactType", String::class.java)
-val filtered = Attribute.of("filtered", Boolean::class.javaObjectType)
+changelog {
+    version = coreVersion
+    groups.empty()
+    path = "changelog.md"
+}
 
-dependencies {
-    attributesSchema {
-        attribute(filtered)
-    }
-    artifactTypes.getByName("jar") {
-        attributes.attribute(filtered, false)
-    }
+intellijPlatform {
+    projectName = "Minecraft Development"
 
-    registerTransform(Filter::class) {
-        from.attribute(filtered, false).attribute(artifactType, "jar")
-        to.attribute(filtered, true).attribute(artifactType, "jar")
-
-        parameters {
-            ideaVersion.set(providers.gradleProperty("ideaVersion"))
-            ideaVersionName.set(providers.gradleProperty("ideaVersionName"))
-            depsFile.set(layout.projectDirectory.file(".gradle/intellij-deps.json"))
+    pluginVerification {
+        ides {
+            recommended()
         }
     }
 }
 
-configurations.compileClasspath {
-    attributes.attribute(filtered, true)
-}
-
-intellij {
-    // IntelliJ IDEA dependency
-    version.set(providers.gradleProperty("ideaVersion"))
-    // Bundled plugin dependencies
-    plugins.addAll(
-        "java",
-        "maven",
-        "gradle",
-        "Groovy",
-        "org.toml.lang:$pluginTomlVersion",
-        "ByteCodeViewer",
-        // needed dependencies for unit tests
-        "properties",
-        "junit"
-    )
-
-    pluginName.set("Minecraft Development")
-    updateSinceUntilBuild.set(true)
-
-    downloadSources.set(providers.gradleProperty("downloadIdeaSources").map { it.toBoolean() })
-
-    sandboxDir.set(layout.projectDirectory.dir(".sandbox").toString())
-}
-
-tasks.publishPlugin {
-    // Build numbers are used for
-    properties["buildNumber"]?.let { buildNumber ->
-        project.version = "${project.version}-$buildNumber"
-    }
-    properties["mcdev.deploy.token"]?.let { deployToken ->
-        token.set(deployToken.toString())
-    }
-    channels.add(properties["mcdev.deploy.channel"]?.toString() ?: "Stable")
-}
-
-tasks.runPluginVerifier {
-    ideVersions.addAll("IC-$ideaVersionName")
-}
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(11))
-    }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    options.encoding = "UTF-8"
-    options.compilerArgs = listOf("-proc:none")
-    options.release.set(11)
-}
-
-tasks.withType<KotlinCompile>().configureEach {
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-        // K2 causes the following error: https://youtrack.jetbrains.com/issue/KT-52786
-        freeCompilerArgs = listOf(/*"-Xuse-k2", */"-Xjvm-default=all", "-Xjdk-release=11")
-        kotlinDaemonJvmArguments.add("-Xmx2G")
-    }
+tasks.patchPluginXml {
+    val changelog = project.changelog
+    changeNotes = changelog.render(Changelog.OutputType.HTML)
 }
 
 // Compile classes to be loaded into the Gradle VM to Java 5 to match Groovy
@@ -242,35 +197,34 @@ tasks.processResources {
 
 tasks.test {
     dependsOn(tasks.jar, testLibs)
-    useJUnitPlatform()
-    doFirst {
-        testLibs.resolvedConfiguration.resolvedArtifacts.forEach {
-            systemProperty("testLibs.${it.name}", it.file.absolutePath)
-        }
+
+    testLibs.resolvedConfiguration.resolvedArtifacts.forEach {
+        systemProperty("testLibs.${it.name}", it.file.absolutePath)
     }
     systemProperty("NO_FS_ROOTS_ACCESS_CHECK", "true")
-    jvmArgs("--illegal-access=deny")
+    systemProperty("java.awt.headless", "true")
+
+    jvmArgs(
+        "-Dsun.io.useCanonCaches=false",
+        "-Dsun.io.useCanonPrefixCache=false",
+    )
 }
 
 idea {
     project.settings.taskTriggers.afterSync("generate")
-    module {
-        generatedSourceDirs.add(file("build/gen"))
-        excludeDirs.add(file(intellij.sandboxDir.get()))
-        isDownloadJavadoc = true
-        isDownloadSources = true
-    }
 }
 
 license {
-    header.set(resources.text.fromFile(file("copyright.txt")))
-    style["flex"] = HeaderStyle.BLOCK_COMMENT.format
-    style["bnf"] = HeaderStyle.BLOCK_COMMENT.format
-
     val endings = listOf("java", "kt", "kts", "groovy", "gradle.kts", "xml", "properties", "html", "flex", "bnf")
+    exclude("META-INF/plugin.xml") // https://youtrack.jetbrains.com/issue/IDEA-345026
     include(endings.map { "**/*.$it" })
 
-    exclude("com/demonwav/mcdev/platform/mixin/invalidInjectorMethodSignature/*.java")
+    val projectDir = layout.projectDirectory.asFile
+    exclude {
+        it.file.toRelativeString(projectDir)
+            .replace("\\", "/")
+            .startsWith("src/test/resources")
+    }
 
     tasks {
         register("gradle") {
@@ -278,7 +232,7 @@ license {
                 fileTree(project.projectDir) {
                     include("*.gradle.kts", "gradle.properties")
                     exclude("**/buildSrc/**", "**/build/**")
-                }
+                },
             )
         }
         register("buildSrc") {
@@ -286,25 +240,24 @@ license {
                 project.fileTree(project.projectDir.resolve("buildSrc")) {
                     include("**/*.kt", "**/*.kts")
                     exclude("**/build/**")
-                }
+                },
+            )
+        }
+        register("mixinTestData") {
+            files.from(
+                project.fileTree(project.projectDir.resolve("mixin-test-data")) {
+                    include("**/*.java", "**/*.kts")
+                    exclude("**/build/**")
+                },
             )
         }
         register("grammars") {
             files.from(project.fileTree("src/main/grammars"))
         }
+        register("externalAnnotations") {
+            files.from(project.fileTree("externalAnnotations"))
+        }
     }
-}
-
-tasks.withType<BaseKtLintCheckTask>().configureEach {
-    workerMaxHeapSize.set("512m")
-}
-
-tasks.register("format") {
-    group = "minecraft"
-    description = "Formats source code according to project style"
-    val licenseFormat by tasks.existing
-    val ktlintFormat by tasks.existing
-    dependsOn(licenseFormat, ktlintFormat)
 }
 
 val generateAtLexer by lexer("AtLexer", "com/demonwav/mcdev/platform/mcp/at/gen")
@@ -319,7 +272,13 @@ val generateNbttParser by parser("NbttParser", "com/demonwav/mcdev/nbt/lang/gen"
 val generateLangLexer by lexer("LangLexer", "com/demonwav/mcdev/translations/lang/gen")
 val generateLangParser by parser("LangParser", "com/demonwav/mcdev/translations/lang/gen")
 
-val generateTranslationTemplateLexer by lexer("TranslationTemplateLexer", "com/demonwav/mcdev/translations/lang/gen")
+val generateMEExpressionLexer by lexer("MEExpressionLexer", "com/demonwav/mcdev/platform/mixin/expression/gen")
+val generateMEExpressionParser by parser("MEExpressionParser", "com/demonwav/mcdev/platform/mixin/expression/gen")
+
+val generateTranslationTemplateLexer by lexer(
+    "TranslationTemplateLexer",
+    "com/demonwav/mcdev/translations/template/gen"
+)
 
 val generate by tasks.registering {
     group = "minecraft"
@@ -334,7 +293,9 @@ val generate by tasks.registering {
         generateNbttParser,
         generateLangLexer,
         generateLangParser,
-        generateTranslationTemplateLexer
+        generateMEExpressionLexer,
+        generateMEExpressionParser,
+        generateTranslationTemplateLexer,
     )
 }
 
@@ -343,10 +304,16 @@ sourceSets.main { java.srcDir(generate) }
 // Remove gen directory on clean
 tasks.clean { delete(generate) }
 
-tasks.register("cleanSandbox", Delete::class) {
-    group = "intellij"
-    description = "Deletes the sandbox directory."
-    delete(layout.projectDirectory.dir(".sandbox"))
+tasks.withType<PrepareSandboxTask> {
+    pluginJar.set(tasks.jar.get().archiveFile)
+    val pluginDirName = intellijPlatform.projectName.get()
+    from(externalAnnotationsJar) {
+        into("$pluginDirName/lib/resources")
+    }
+    from("templates") {
+        exclude(".git")
+        into("$pluginDirName/lib/resources/builtin-templates")
+    }
 }
 
 tasks.runIde {
@@ -356,30 +323,13 @@ tasks.runIde {
         systemProperty("idea.ProcessCanceledException", "disabled")
         systemProperty("idea.debug.mode", "true")
     }
+
+    // Kotlin K2 is enabled by default, uncomment to switch to K1
+    // jvmArgumentProviders += CommandLineArgumentProvider {
+    //     listOf("-Didea.kotlin.plugin.use.k2=false")
+    // }
+
     // Set these properties to test different languages
-    // systemProperty("user.language", "en")
-    // systemProperty("user.country", "US")
-}
-
-tasks.buildSearchableOptions {
-    // not working atm
-    enabled = false
-    // https://youtrack.jetbrains.com/issue/IDEA-210683
-    jvmArgs(
-        "--illegal-access=deny",
-        "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED",
-        "--add-opens=java.base/java.lang=ALL-UNNAMED",
-        "--add-opens=java.base/java.util=ALL-UNNAMED",
-        "--add-opens=java.desktop/java.awt.event=ALL-UNNAMED",
-        "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
-        "--add-opens=java.desktop/javax.swing.plaf.basic=ALL-UNNAMED",
-        "--add-opens=java.desktop/javax.swing=ALL-UNNAMED",
-        "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
-        "--add-opens=java.desktop/sun.font=ALL-UNNAMED",
-        "--add-opens=java.desktop/sun.swing=ALL-UNNAMED"
-    )
-
-    if (OperatingSystem.current().isMacOsX) {
-        jvmArgs("--add-opens=java.desktop/com.apple.eawt.event=ALL-UNNAMED")
-    }
+    // systemProperty("user.language", "fr")
+    // systemProperty("user.country", "FR")
 }

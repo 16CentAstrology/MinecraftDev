@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.reference
@@ -42,21 +52,37 @@ sealed class TranslationFindUsagesProvider : FindUsagesProvider {
 }
 
 class JsonFindUsagesProvider : TranslationFindUsagesProvider() {
-    override fun getWordsScanner(): WordsScanner? =
+    override fun getWordsScanner(): WordsScanner =
         DefaultWordsScanner(
             JsonLexer(),
             TokenSet.create(JsonElementTypes.DOUBLE_QUOTED_STRING, JsonElementTypes.SINGLE_QUOTED_STRING),
             TokenSet.create(JsonElementTypes.BLOCK_COMMENT, JsonElementTypes.LINE_COMMENT),
-            TokenSet.EMPTY
+            TokenSet.EMPTY,
         )
+
+    override fun equals(other: Any?): Boolean {
+        return this === other
+    }
+
+    override fun hashCode(): Int {
+        return System.identityHashCode(this)
+    }
 }
 
 class LangFindUsagesProvider : TranslationFindUsagesProvider() {
-    override fun getWordsScanner(): WordsScanner? =
+    override fun getWordsScanner(): WordsScanner =
         DefaultWordsScanner(
             LangLexerAdapter(),
             TokenSet.create(LangTypes.KEY),
             TokenSet.create(LangTypes.COMMENT),
-            TokenSet.EMPTY
+            TokenSet.EMPTY,
         )
+
+    override fun equals(other: Any?): Boolean {
+        return this === other
+    }
+
+    override fun hashCode(): Int {
+        return System.identityHashCode(this)
+    }
 }

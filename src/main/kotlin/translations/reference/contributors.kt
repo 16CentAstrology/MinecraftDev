@@ -1,17 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.reference
 
 import com.demonwav.mcdev.translations.TranslationFiles
-import com.demonwav.mcdev.translations.identification.TranslationIdentifier
 import com.demonwav.mcdev.translations.identification.TranslationInstance
 import com.demonwav.mcdev.translations.lang.gen.psi.LangEntry
 import com.demonwav.mcdev.translations.lang.gen.psi.LangTypes
@@ -24,34 +33,29 @@ import com.intellij.psi.PsiReference
 import com.intellij.psi.PsiReferenceContributor
 import com.intellij.psi.PsiReferenceProvider
 import com.intellij.psi.PsiReferenceRegistrar
+import com.intellij.psi.registerUastReferenceProvider
+import com.intellij.psi.uastReferenceProvider
 import com.intellij.util.ProcessingContext
+import org.jetbrains.uast.UElement
 
-class JavaReferenceContributor : PsiReferenceContributor() {
+class UastReferenceContributor : PsiReferenceContributor() {
     override fun registerReferenceProviders(registrar: PsiReferenceRegistrar) {
-        for (identifier in TranslationIdentifier.INSTANCES) {
-            registrar.registerReferenceProvider(
-                PlatformPatterns.psiElement(identifier.elementClass()),
-                object : PsiReferenceProvider() {
-                    override fun getReferencesByElement(
-                        element: PsiElement,
-                        context: ProcessingContext
-                    ): Array<PsiReference> {
-                        val result = identifier.identifyUnsafe(element)
-                        if (result != null) {
-                            val referenceElement = result.referenceElement ?: return emptyArray()
-                            return arrayOf(
-                                TranslationReference(
-                                    referenceElement,
-                                    TextRange(1, referenceElement.textLength - 1),
-                                    result.key
-                                )
-                            )
-                        }
-                        return emptyArray()
-                    }
-                }
-            )
-        }
+        registrar.registerUastReferenceProvider(
+            { _, _ -> true },
+            uastReferenceProvider<UElement> { uExpr, psi ->
+                val translation = TranslationInstance.find(uExpr)
+                    ?: return@uastReferenceProvider emptyArray()
+                val referenceElement = translation.referenceElement
+                    ?: return@uastReferenceProvider emptyArray()
+                arrayOf(
+                    TranslationReference(
+                        psi,
+                        TextRange(1, referenceElement.asSourceString().length - 1),
+                        translation.key,
+                    ),
+                )
+            }
+        )
     }
 }
 
@@ -62,7 +66,7 @@ class JsonReferenceContributor : PsiReferenceContributor() {
             object : PsiReferenceProvider() {
                 override fun getReferencesByElement(
                     element: PsiElement,
-                    context: ProcessingContext
+                    context: ProcessingContext,
                 ): Array<PsiReference> {
                     if (!TranslationFiles.isTranslationFile(element.containingFile?.virtualFile)) {
                         return arrayOf()
@@ -76,13 +80,13 @@ class JsonReferenceContributor : PsiReferenceContributor() {
                         TranslationReference(
                             element,
                             nameTextRange.shiftRight(1).grown(-2),
-                            TranslationInstance.Key("", entry.name, "")
+                            TranslationInstance.Key("", entry.name, ""),
                         ) { elem, _, newName ->
                             (elem as JsonProperty).setName(newName)
-                        }
+                        },
                     )
                 }
-            }
+            },
         )
     }
 }
@@ -94,18 +98,18 @@ class LangReferenceContributor : PsiReferenceContributor() {
             object : PsiReferenceProvider() {
                 override fun getReferencesByElement(
                     element: PsiElement,
-                    context: ProcessingContext
+                    context: ProcessingContext,
                 ): Array<PsiReference> {
                     val entry = element as LangEntry
                     return arrayOf(
                         TranslationReference(
                             element,
                             TextRange(0, entry.key.length),
-                            TranslationInstance.Key("", entry.key, "")
-                        )
+                            TranslationInstance.Key("", entry.key, ""),
+                        ),
                     )
                 }
-            }
+            },
         )
     }
 }

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.config.inspection
@@ -36,6 +46,7 @@ import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 import com.intellij.psi.util.PsiUtil
 
 class ConfigValueInspection : MixinConfigInspection() {
@@ -56,8 +67,9 @@ class ConfigValueInspection : MixinConfigInspection() {
 
         private fun checkValue(type: PsiType, value: JsonValue) {
             val valid = when (type) {
-                PsiType.BOOLEAN -> value is JsonBooleanLiteral
-                PsiType.BYTE, PsiType.DOUBLE, PsiType.FLOAT, PsiType.INT, PsiType.LONG, PsiType.SHORT ->
+                PsiTypes.booleanType() -> value is JsonBooleanLiteral
+                PsiTypes.byteType(), PsiTypes.doubleType(), PsiTypes.floatType(), PsiTypes.intType(),
+                PsiTypes.longType(), PsiTypes.shortType() ->
                     value is JsonNumberLiteral
                 is PsiArrayType -> checkArray(type.componentType, value)
                 else -> checkObject(type, value)
@@ -112,7 +124,7 @@ class ConfigValueInspection : MixinConfigInspection() {
             JAVA_LANG_FLOAT,
             JAVA_LANG_INTEGER,
             JAVA_LANG_LONG,
-            JAVA_LANG_SHORT
+            JAVA_LANG_SHORT,
         )
     }
 }

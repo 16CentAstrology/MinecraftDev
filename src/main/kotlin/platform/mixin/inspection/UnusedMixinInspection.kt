@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.inspection
@@ -39,8 +49,8 @@ class UnusedMixinInspection : MixinInspection() {
     override fun buildVisitor(holder: ProblemsHolder) = Visitor(holder)
 
     class Visitor(private val holder: ProblemsHolder) : JavaElementVisitor() {
-        override fun visitClass(clazz: PsiClass?) {
-            val module = clazz?.findModule() ?: return
+        override fun visitClass(clazz: PsiClass) {
+            val module = clazz.findModule() ?: return
             if (clazz.isMixin) {
                 for (config in MixinModule.getMixinConfigs(module.project, GlobalSearchScope.moduleScope(module))) {
                     if (config.qualifiedMixins.any { it == clazz.fullQualifiedName }) {
@@ -57,7 +67,7 @@ class UnusedMixinInspection : MixinInspection() {
                 val bestQuickFixConfig = MixinModule.getBestWritableConfigForMixinClass(
                     module.project,
                     GlobalSearchScope.moduleScope(module),
-                    clazz.fullQualifiedName ?: ""
+                    clazz.fullQualifiedName ?: "",
                 )
                 val problematicElement = clazz.nameIdentifier
                 if (problematicElement != null) {
@@ -84,7 +94,7 @@ class UnusedMixinInspection : MixinInspection() {
     private class QuickFix(
         private val quickFixFile: VirtualFile,
         private val qualifiedName: String,
-        private val side: Side
+        private val side: Side,
     ) : LocalQuickFix {
 
         private val sideDisplayName = when (side) {

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.handlers
@@ -18,10 +28,6 @@ import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.SHADOW
 import com.demonwav.mcdev.platform.mixin.util.MixinTargetMember
 import com.demonwav.mcdev.platform.mixin.util.findFieldByName
 import com.demonwav.mcdev.platform.mixin.util.findMethod
-import com.demonwav.mcdev.platform.mixin.util.findOrConstructSourceField
-import com.demonwav.mcdev.platform.mixin.util.findOrConstructSourceMethod
-import com.demonwav.mcdev.platform.mixin.util.findSourceElement
-import com.demonwav.mcdev.platform.mixin.util.findSourceField
 import com.demonwav.mcdev.util.MemberReference
 import com.demonwav.mcdev.util.constantStringValue
 import com.demonwav.mcdev.util.descriptor
@@ -45,10 +51,10 @@ class ShadowHandler : MixinMemberAnnotationHandler {
         return when (member) {
             is PsiMethod -> listOfNotNull(
                 targetClass.findMethod(MemberReference(name, member.descriptor))
-                    ?.let { MethodTargetMember(targetClass, it) }
+                    ?.let { MethodTargetMember(targetClass, it) },
             )
             is PsiField -> listOfNotNull(
-                targetClass.findFieldByName(name)?.let { FieldTargetMember(targetClass, it) }
+                targetClass.findFieldByName(name)?.let { FieldTargetMember(targetClass, it) },
             )
             else -> emptyList()
         }
@@ -74,39 +80,15 @@ class ShadowHandler : MixinMemberAnnotationHandler {
     fun findFirstShadowTargetForNavigation(member: PsiMember): SmartPsiElementPointer<PsiElement>? {
         val shadow = member.findAnnotation(SHADOW) ?: return null
         val shadowTarget = resolveTarget(shadow).firstOrNull() ?: return null
-        return when (shadowTarget) {
-            is FieldTargetMember -> shadowTarget.classAndField.field.findSourceField(
-                shadowTarget.classAndField.clazz,
-                member.project,
-                member.resolveScope,
-                canDecompile = false
-            )
-            is MethodTargetMember -> shadowTarget.classAndMethod.method.findSourceElement(
-                shadowTarget.classAndMethod.clazz,
-                member.project,
-                member.resolveScope,
-                canDecompile = false
-            )
-        }?.createSmartPointer()
+        return shadowTarget.findSourceElement(member.project, member.resolveScope, canDecompile = false)
+            ?.createSmartPointer()
     }
 
     fun findFirstShadowTargetForReference(member: PsiMember): SmartPsiElementPointer<PsiMember>? {
         val shadow = member.findAnnotation(SHADOW) ?: return null
         val shadowTarget = resolveTarget(shadow).firstOrNull() ?: return null
-        return when (shadowTarget) {
-            is FieldTargetMember -> shadowTarget.classAndField.field.findOrConstructSourceField(
-                shadowTarget.classAndField.clazz,
-                member.project,
-                member.resolveScope,
-                canDecompile = false
-            )
-            is MethodTargetMember -> shadowTarget.classAndMethod.method.findOrConstructSourceMethod(
-                shadowTarget.classAndMethod.clazz,
-                member.project,
-                member.resolveScope,
-                canDecompile = false
-            )
-        }.createSmartPointer()
+        return shadowTarget.findOrConstructSourceMember(member.project, member.resolveScope, canDecompile = false)
+            .createSmartPointer()
     }
 
     private fun hasAliases(shadow: PsiAnnotation) = shadow.findDeclaredAttributeValue("aliases").isNotEmpty()

@@ -1,21 +1,33 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.intellij.codeInspection.InspectionProfileEntry
 import com.intellij.lang.java.lexer.JavaLexer
 import com.intellij.openapi.application.AppUIExecutor
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
@@ -30,13 +42,18 @@ import com.intellij.openapi.roots.libraries.LibraryKindRegistry
 import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.Condition
 import com.intellij.openapi.util.Ref
+import com.intellij.openapi.util.ThrowableComputable
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.pom.java.LanguageLevel
+import com.intellij.profile.codeInspection.InspectionProfileManager
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import java.lang.invoke.MethodHandles
 import java.util.Locale
+import java.util.concurrent.CancellationException
 import kotlin.math.min
 import kotlin.reflect.KClass
+import org.jetbrains.annotations.NonNls
 import org.jetbrains.concurrency.Promise
 import org.jetbrains.concurrency.runAsync
 
@@ -52,30 +69,25 @@ fun runWriteTaskLater(func: () -> Unit) {
     }
 }
 
-inline fun <T : Any?> Project.runWriteTaskInSmartMode(crossinline func: () -> T): T {
-    if (ApplicationManager.getApplication().isReadAccessAllowed) {
-        return runWriteTask { func() }
-    }
-
+inline fun Project.runWriteTaskInSmartMode(crossinline func: () -> Unit) {
     val dumbService = DumbService.getInstance(this)
-    val ref = Ref<T>()
-    while (true) {
-        dumbService.waitForSmartMode()
-        val success = runWriteTask {
+    lateinit var runnable: Runnable
+    runnable = Runnable {
+        if (isDisposed) {
+            throw ProcessCanceledException()
+        }
+        runWriteTask {
             if (isDisposed) {
                 throw ProcessCanceledException()
             }
             if (dumbService.isDumb) {
-                return@runWriteTask false
+                dumbService.runWhenSmart(runnable)
+            } else {
+                func()
             }
-            ref.set(func())
-            return@runWriteTask true
-        }
-        if (success) {
-            break
         }
     }
-    return ref.get()
+    dumbService.runWhenSmart(runnable)
 }
 
 fun <T : Any?> invokeAndWait(func: () -> T): T {
@@ -100,6 +112,10 @@ fun <T> invokeEdt(block: () -> T): T {
     return AppUIExecutor.onUiThread().submit(block).get()
 }
 
+inline fun <T> runWriteActionAndWait(crossinline action: () -> T): T {
+    return WriteAction.computeAndWait(ThrowableComputable { action() })
+}
+
 inline fun <T : Any?> PsiFile.runWriteAction(crossinline func: () -> T) =
     applyWriteAction { func() }
 
@@ -111,7 +127,7 @@ inline fun <T : Any?> PsiFile.applyWriteAction(crossinline func: PsiFile.() -> T
     return result
 }
 
-inline fun <T> runReadActionAsync(crossinline runnable: () -> T): Promise<T> {
+fun <T> runReadActionAsync(runnable: () -> T): Promise<T> {
     return runAsync {
         runReadAction(runnable)
     }
@@ -124,6 +140,11 @@ fun waitForAllSmart() {
         }
     }
 }
+
+inline fun <reified T : InspectionProfileEntry> Project.findInspection(@NonNls shortName: String): T? =
+    InspectionProfileManager.getInstance(this)
+        .currentProfile.getInspectionTool(shortName, this)
+        ?.tool as? T
 
 /**
  * Returns an untyped array for the specified [Collection].
@@ -228,8 +249,12 @@ fun Module.findChildren(): Set<Module> {
                 continue
             }
 
-            val path = manager.getModuleGroupPath(m) ?: continue
-            val namedModule = path.last()?.let { manager.findModuleByName(it) } ?: continue
+            val path = manager.getModuleGrouper(null).getGroupPath(m)
+            if (path.isEmpty()) {
+                continue
+            }
+
+            val namedModule = manager.findModuleByName(path.last()) ?: continue
 
             if (namedModule != this) {
                 continue
@@ -306,6 +331,9 @@ fun String.toJavaIdentifier(allowDollars: Boolean = true): String {
         .joinToString("")
 }
 
+fun String.toJavaClassName() = StringUtil.capitalizeWords(this, true)
+    .replace(" ", "").toJavaIdentifier(allowDollars = false)
+
 fun String.toPackageName(): String {
     if (this.isEmpty()) {
         return "_"
@@ -334,7 +362,8 @@ inline fun <reified T> Iterable<*>.firstOfType(): T? {
     return this.firstOrNull { it is T } as? T
 }
 
-fun libraryKind(id: String): LibraryKind = LibraryKindRegistry.getInstance().findKindById(id) ?: LibraryKind.create(id)
+fun libraryKind(id: String): Lazy<LibraryKind> =
+    lazy { LibraryKindRegistry.getInstance().findKindById(id) ?: LibraryKind.create(id) }
 
 fun String.capitalize(): String =
     replaceFirstChar {
@@ -351,3 +380,48 @@ fun String.decapitalize(): String = replaceFirstChar { it.lowercase(Locale.ENGLI
 // put the whole class name in as a string (easier to refactor, etc.)
 @Suppress("NOTHING_TO_INLINE") // In order for this to work this function must be `inline`
 inline fun loggerForTopLevel() = Logger.getInstance(MethodHandles.lookup().lookupClass())
+
+inline fun <T> runCatchingKtIdeaExceptions(action: () -> T): T? = try {
+    action()
+} catch (e: Exception) {
+    when (e.javaClass.name) {
+        "org.jetbrains.kotlin.idea.caches.resolve.KotlinIdeaResolutionException",
+        "org.jetbrains.kotlin.utils.KotlinExceptionWithAttachments" -> {
+            loggerForTopLevel().info("Caught Kotlin plugin exception", e)
+            null
+        }
+        else -> throw e
+    }
+}
+
+fun <T> Result<T>.getOrLogException(logger: Logger): T? {
+    return getOrLogException<T>(logger::error)
+}
+
+inline fun <T> Result<T>.getOrLogException(log: (Throwable) -> Unit): T? {
+    return onFailure { e ->
+        if (e is ProcessCanceledException || e is CancellationException) {
+            throw e
+        }
+        log(e)
+    }.getOrNull()
+}
+
+fun <T : Throwable> withSuppressed(original: T?, other: T): T =
+    original?.apply { addSuppressed(other) } ?: other
+
+fun <S : CharSequence, R> S.ifNotBlank(block: (S) -> R): R? {
+    if (this.isNotBlank()) {
+        return block(this)
+    }
+
+    return null
+}
+
+inline fun <reified T : Enum<T>> enumValueOfOrNull(str: String): T? {
+    return try {
+        enumValueOf<T>(str)
+    } catch (e: IllegalArgumentException) {
+        null
+    }
+}

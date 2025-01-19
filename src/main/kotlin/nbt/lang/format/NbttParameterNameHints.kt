@@ -1,15 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.nbt.lang.format
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.nbt.lang.gen.psi.NbttByteArray
 import com.demonwav.mcdev.nbt.lang.gen.psi.NbttCompound
 import com.demonwav.mcdev.nbt.lang.gen.psi.NbttIntArray
@@ -29,9 +40,9 @@ class NbttParameterNameHints : InlayParameterHintsProvider {
                 val size = element.getNamedTagList().size
                 list.add(
                     InlayInfo(
-                        "$size ${if (size == 1) "child" else "children"}",
-                        element.textRange.startOffset + 1
-                    )
+                        children(size),
+                        element.textRange.startOffset + 1,
+                    ),
                 )
             }
             is NbttList -> {
@@ -39,9 +50,9 @@ class NbttParameterNameHints : InlayParameterHintsProvider {
                 val size = element.getTagList().size
                 list.add(
                     InlayInfo(
-                        "$size ${if (size == 1) "child" else "children"}",
-                        element.textRange.startOffset + 1
-                    )
+                        children(size),
+                        element.textRange.startOffset + 1,
+                    ),
                 )
 
                 if (size > 5) {
@@ -55,9 +66,9 @@ class NbttParameterNameHints : InlayParameterHintsProvider {
                 val size = element.getByteList().size
                 list.add(
                     InlayInfo(
-                        "$size ${if (size == 1) "child" else "children"}",
-                        element.node.getChildren(null)[1].textRange.startOffset + 1
-                    )
+                        children(size),
+                        element.node.getChildren(null)[1].textRange.startOffset + 1,
+                    ),
                 )
 
                 if (size > 5) {
@@ -71,9 +82,9 @@ class NbttParameterNameHints : InlayParameterHintsProvider {
                 val size = element.getIntList().size
                 list.add(
                     InlayInfo(
-                        "$size ${if (size == 1) "child" else "children"}",
-                        element.node.getChildren(null)[1].textRange.startOffset + 1
-                    )
+                        children(size),
+                        element.node.getChildren(null)[1].textRange.startOffset + 1,
+                    ),
                 )
 
                 if (size > 5) {
@@ -87,9 +98,9 @@ class NbttParameterNameHints : InlayParameterHintsProvider {
                 val size = element.getLongList().size
                 list.add(
                     InlayInfo(
-                        "$size ${if (size == 1) "child" else "children"}",
-                        element.node.getChildren(null)[1].textRange.startOffset + 1
-                    )
+                        children(size),
+                        element.node.getChildren(null)[1].textRange.startOffset + 1,
+                    ),
                 )
 
                 // Index hints
@@ -116,6 +127,14 @@ class NbttParameterNameHints : InlayParameterHintsProvider {
         }
 
         return list
+    }
+
+    private fun children(size: Int): String {
+        return if (size == 1) {
+            MCDevBundle("nbt.lang.inlay_hints.one_child")
+        } else {
+            MCDevBundle("nbt.lang.inlay_hints.children", size)
+        }
     }
 
     override fun getHintInfo(element: PsiElement): HintInfo? = null

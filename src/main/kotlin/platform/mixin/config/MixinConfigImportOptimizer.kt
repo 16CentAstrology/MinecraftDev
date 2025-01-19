@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.config
@@ -23,6 +33,7 @@ import com.intellij.openapi.util.EmptyRunnable
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import kotlin.math.min
 
 class MixinConfigImportOptimizer : ImportOptimizer {
 
@@ -52,7 +63,7 @@ class MixinConfigImportOptimizer : ImportOptimizer {
             val parts1 = class1.split('.')
             val parts2 = class2.split('.')
 
-            val end = Math.min(parts1.size - 1, parts2.size - 1)
+            val end = min(parts1.size - 1, parts2.size - 1)
             for (i in 0 until end) {
                 val result = parts1[i].compareTo(parts2[i], ignoreCase = true)
                 if (result != 0) {
@@ -62,7 +73,7 @@ class MixinConfigImportOptimizer : ImportOptimizer {
 
             if (parts1.size != parts2.size) {
                 // Default package always comes first
-                return Integer.compare(parts1.size, parts2.size)
+                return parts1.size.compareTo(parts2.size)
             }
 
             // Compare class names
@@ -70,7 +81,7 @@ class MixinConfigImportOptimizer : ImportOptimizer {
         }
     }
 
-    override fun supports(file: PsiFile) = file is JsonFile && file.fileType == MixinConfigFileType
+    override fun supports(file: PsiFile) = file is JsonFile && file.fileType is MixinConfigFileType
 
     override fun processFile(file: PsiFile): Runnable {
         if (file !is JsonFile) {
@@ -106,7 +117,7 @@ class MixinConfigImportOptimizer : ImportOptimizer {
         private val file: JsonFile,
         private val mixins: JsonArray?,
         private val server: JsonArray?,
-        private val client: JsonArray?
+        private val client: JsonArray?,
     ) : Runnable {
 
         override fun run() {

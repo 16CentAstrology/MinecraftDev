@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.index
@@ -53,11 +63,22 @@ class TranslationIndex : FileBasedIndexExtension<String, TranslationIndexEntry>(
         fun getProjectDefaultTranslations(project: Project, domain: String? = null) =
             getProjectDefaultEntries(project, domain).flatten()
 
+        fun hasDefaultTranslations(project: Project, domain: String? = null): Boolean {
+            return !FileBasedIndex.getInstance()
+                .processValues(
+                    NAME,
+                    TranslationConstants.DEFAULT_LOCALE,
+                    null,
+                    { _, entry -> entry.sourceDomain != domain },
+                    GlobalSearchScope.projectScope(project)
+                )
+        }
+
         fun getTranslations(project: Project, file: VirtualFile): Sequence<Translation> {
             return getEntries(
                 GlobalSearchScope.fileScope(project, file),
                 TranslationFiles.getLocale(file) ?: return emptySequence(),
-                file.mcDomain
+                file.mcDomain,
             ).flatten()
         }
 
@@ -66,22 +87,18 @@ class TranslationIndex : FileBasedIndexExtension<String, TranslationIndexEntry>(
             return getEntries(
                 GlobalSearchScope.fileScope(file),
                 TranslationFiles.getLocale(virtualFile) ?: return emptySequence(),
-                virtualFile.mcDomain
+                virtualFile.mcDomain,
             ).flatten()
         }
 
         fun getAllDefaultEntries(project: Project, domain: String? = null) =
             getEntries(GlobalSearchScope.allScope(project), TranslationConstants.DEFAULT_LOCALE, domain)
 
-        fun getProjectDefaultEntries(project: Project, domain: String? = null) =
+        private fun getProjectDefaultEntries(project: Project, domain: String? = null) =
             getEntries(GlobalSearchScope.projectScope(project), TranslationConstants.DEFAULT_LOCALE, domain)
 
         fun getEntries(scope: GlobalSearchScope, locale: String, domain: String? = null) =
-            FileBasedIndex.getInstance().getValues(
-                TranslationIndex.NAME,
-                locale,
-                scope
-            ).asSequence()
+            FileBasedIndex.getInstance().getValues(NAME, locale, scope,).asSequence()
                 .filter { domain == null || it.sourceDomain == domain }
 
         private fun Sequence<TranslationIndexEntry>.flatten() = this.flatMap { it.translations.asSequence() }
@@ -108,7 +125,7 @@ class TranslationIndex : FileBasedIndexExtension<String, TranslationIndexEntry>(
     private object Indexer : DataIndexer<String, TranslationIndexEntry, FileContent> {
         override fun map(inputData: FileContent): MutableMap<String, TranslationIndexEntry> {
             val domain = inputData.file.mcDomain ?: return mutableMapOf()
-            val entry = TranslationProvider.INSTANCES[inputData.fileType]?.map(domain, inputData)
+            val entry = TranslationProvider.INSTANCES[inputData.fileType.name]?.map(domain, inputData)
                 ?: return mutableMapOf()
             val locale = TranslationFiles.getLocale(inputData.file) ?: return mutableMapOf()
             return mutableMapOf(locale to entry)

@@ -1,18 +1,27 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util
 
 import com.intellij.codeInsight.daemon.impl.quickfix.AddMethodFix
 import com.intellij.navigation.AnonymousElementProvider
-import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.CommonClassNames
 import com.intellij.psi.JavaPsiFacade
@@ -20,7 +29,6 @@ import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiField
-import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiInvalidElementAccessException
 import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.PsiMethod
@@ -117,7 +125,7 @@ fun findQualifiedClass(fullQualifiedName: String, context: PsiElement): PsiClass
 fun findQualifiedClass(
     project: Project,
     fullQualifiedName: String,
-    scope: GlobalSearchScope = GlobalSearchScope.allScope(project)
+    scope: GlobalSearchScope = GlobalSearchScope.allScope(project),
 ): PsiClass? {
     return findQualifiedClass(fullQualifiedName) { name ->
         JavaPsiFacade.getInstance(project).findClass(name, scope)
@@ -126,7 +134,7 @@ fun findQualifiedClass(
 
 fun findQualifiedClass(
     fullQualifiedName: String,
-    outerResolver: (String) -> PsiClass?
+    outerResolver: (String) -> PsiClass?,
 ): PsiClass? {
     var innerPos = fullQualifiedName.indexOf('$')
     if (innerPos == -1) {
@@ -163,7 +171,7 @@ private fun PsiClass.findInnerClass(name: String): PsiClass? {
 }
 
 @Throws(ClassNameResolutionFailedException::class)
-fun PsiElement.getAnonymousIndex(anonymousElement: PsiElement): Int? {
+fun PsiElement.getAnonymousIndex(anonymousElement: PsiElement): Int {
     // Attempt to find name for anonymous class
     for ((i, element) in anonymousElements.withIndex()) {
         if (element equivalentTo anonymousElement) {
@@ -218,21 +226,14 @@ fun PsiClass.addImplements(qualifiedClassName: String) {
  * Adds the given method to this class, or its copy. Returns the method actually added
  */
 fun PsiClass.addMethod(template: PsiMethod): PsiMethod? {
-    var theNewMethod: PsiMethod? = null
-    object : AddMethodFix(template, this) {
-        override fun postAddAction(file: PsiFile, editor: Editor?, newMethod: PsiMethod?) {
-            theNewMethod = newMethod
-            super.postAddAction(file, editor, newMethod)
-        }
-    }.applyFix()
-    return theNewMethod
+    return AddMethodFix(template, this).createMethod(this)
 }
 
 fun PsiClass.findMatchingMethod(
     pattern: PsiMethod,
     checkBases: Boolean,
     name: String = pattern.name,
-    constructor: Boolean = pattern.isConstructor
+    constructor: Boolean = pattern.isConstructor,
 ): PsiMethod? {
     return findMethodsByName(name, checkBases).firstOrNull { it.isMatchingMethod(pattern, constructor) }
 }
@@ -241,7 +242,7 @@ fun PsiClass.findMatchingMethods(
     pattern: PsiMethod,
     checkBases: Boolean,
     name: String = pattern.name,
-    constructor: Boolean = pattern.isConstructor
+    constructor: Boolean = pattern.isConstructor,
 ): List<PsiMethod> {
     return findMethodsByName(name, checkBases).filter { it.isMatchingMethod(pattern, constructor) }
 }
@@ -250,7 +251,7 @@ inline fun PsiClass.findMatchingMethods(
     pattern: PsiMethod,
     checkBases: Boolean,
     name: String,
-    func: (PsiMethod) -> Unit
+    func: (PsiMethod) -> Unit,
 ) {
     for (method in findMethodsByName(name, checkBases)) {
         if (method.isMatchingMethod(pattern)) {
@@ -279,7 +280,7 @@ fun PsiField.isMatchingField(pattern: PsiField): Boolean {
 
 private fun areReallyOnlyParametersErasureEqual(
     parameterList1: PsiParameterList,
-    parameterList2: PsiParameterList
+    parameterList2: PsiParameterList,
 ): Boolean {
     // Similar to MethodSignatureUtil.areParametersErasureEqual, but doesn't check method name
     if (parameterList1.parametersCount != parameterList2.parametersCount) {

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.sponge.inspection
@@ -48,7 +58,7 @@ class SpongeWrongGetterTypeInspection : AbstractBaseUastLocalInspectionTool() {
     override fun checkMethod(
         method: UMethod,
         manager: InspectionManager,
-        isOnTheFly: Boolean
+        isOnTheFly: Boolean,
     ): Array<ProblemDescriptor>? {
         val parameters = method.uastParameters
         if (parameters.size < 2 || !method.isValidSpongeListener()) {
@@ -73,7 +83,7 @@ class SpongeWrongGetterTypeInspection : AbstractBaseUastLocalInspectionTool() {
             val getterSubst = TypeConversionUtil.getSuperClassSubstitutor(
                 getterClass.javaPsi,
                 eventClass,
-                eventTypeSubstitutor
+                eventTypeSubstitutor,
             )
             val getterReturnType = getterMethod.returnType?.let(getterSubst::substitute) ?: continue
             val parameterType = parameter.type
@@ -105,7 +115,7 @@ class SpongeWrongGetterTypeInspection : AbstractBaseUastLocalInspectionTool() {
                 this.staticDescription,
                 isOnTheFly,
                 fixes,
-                ProblemHighlightType.GENERIC_ERROR_OR_WARNING
+                ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
             )
         }
         return problems.toTypedArray()
@@ -126,7 +136,7 @@ class SpongeWrongGetterTypeInspection : AbstractBaseUastLocalInspectionTool() {
         method: JvmMethod,
         expectedType: PsiType,
         paramIndex: Int,
-        project: Project
+        project: Project,
     ): Array<out LocalQuickFix> {
         if (expectedType is PsiPrimitiveType ||
             expectedType is PsiClassType && !isOptional(expectedType)
@@ -155,7 +165,7 @@ class SpongeWrongGetterTypeInspection : AbstractBaseUastLocalInspectionTool() {
         // Suggest a non-Optional version too
         return arrayOf(
             Fix(method, paramIndex, expectedType),
-            Fix(method, paramIndex, fixedClassType)
+            Fix(method, paramIndex, fixedClassType),
         )
     }
 
@@ -174,7 +184,7 @@ class SpongeWrongGetterTypeInspection : AbstractBaseUastLocalInspectionTool() {
                 val newParam = expectedParameter(
                     expectedType,
                     existingParam.semanticNames.first(),
-                    existingParam.expectedAnnotations
+                    existingParam.expectedAnnotations,
                 )
                 actualParams.toMutableList().also { it[paramIndex] = newParam }
             }

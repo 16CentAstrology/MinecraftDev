@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.handlers
@@ -23,7 +33,7 @@ import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMember
 import com.intellij.psi.PsiMethod
-import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 import com.intellij.psi.SmartPsiElementPointer
 import com.intellij.psi.util.createSmartPointer
 import com.intellij.psi.util.parentOfType
@@ -47,7 +57,7 @@ class AccessorHandler : MixinMemberAnnotationHandler {
             if (!method.hasParameters() && accessorInfo.type.allowGetters) {
                 it.desc == method.returnType?.descriptor
             } else if (
-                PsiType.VOID == method.returnType && method.parameterList.parametersCount == 1 &&
+                PsiTypes.voidType() == method.returnType && method.parameterList.parametersCount == 1 &&
                 accessorInfo.type.allowSetters
             ) {
                 it.desc == method.parameterList.parameters[0].type.descriptor
@@ -74,7 +84,7 @@ class AccessorHandler : MixinMemberAnnotationHandler {
         val result = PATTERN.matchEntire(memberName) ?: return null
         val prefix = result.groupValues[1]
         var name = result.groupValues[2]
-        if (name.uppercase(Locale.ENGLISH) != name) {
+        if (name.uppercase(Locale.ENGLISH) != name || name.length == 1) {
             name = name.decapitalize()
         }
         val type = if (prefix == "set") {
@@ -92,7 +102,7 @@ class AccessorHandler : MixinMemberAnnotationHandler {
             targetMember.classAndField.clazz,
             method.project,
             method.resolveScope,
-            canDecompile = false
+            canDecompile = false,
         ).createSmartPointer()
     }
 
@@ -103,6 +113,7 @@ class AccessorHandler : MixinMemberAnnotationHandler {
     enum class AccessorType(val allowGetters: Boolean, val allowSetters: Boolean) {
         GETTER(true, false),
         SETTER(false, true),
-        UNKNOWN(true, true);
+        UNKNOWN(true, true),
+        ;
     }
 }

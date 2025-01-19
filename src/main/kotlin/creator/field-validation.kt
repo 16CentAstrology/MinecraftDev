@@ -1,50 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.creator
 
-import com.demonwav.mcdev.creator.exception.BadListSetupException
-import com.demonwav.mcdev.creator.exception.EmptyInputSetupException
-import com.demonwav.mcdev.creator.exception.InvalidClassNameException
 import com.demonwav.mcdev.util.isJavaKeyword
-import javax.swing.JTextField
-
-@Target(AnnotationTarget.FIELD)
-@Retention(AnnotationRetention.RUNTIME)
-annotation class ValidatedField(vararg val value: ValidatedFieldType)
-
-enum class ValidatedFieldType {
-    NON_BLANK {
-        override fun validate(field: JTextField) {
-            if (field.text.isBlank()) {
-                throw EmptyInputSetupException(field)
-            }
-        }
-    },
-    CLASS_NAME {
-        override fun validate(field: JTextField) {
-            if (!isValidClassName(field.text)) {
-                throw InvalidClassNameException(field)
-            }
-        }
-    },
-    LIST {
-        override fun validate(field: JTextField) {
-            if (!field.text.matches(listPattern)) {
-                throw BadListSetupException(field)
-            }
-        }
-    };
-
-    abstract fun validate(field: JTextField)
-}
 
 fun isValidClassName(className: String): Boolean {
     // default package
@@ -66,11 +42,5 @@ fun isValidClassName(className: String): Boolean {
         return false
     }
     // keyword identifier
-    if (fieldNameSplit.any { it.isJavaKeyword() }) {
-        return false
-    }
-
-    return true
+    return !fieldNameSplit.any { it.isJavaKeyword() }
 }
-
-private val listPattern = Regex("""(\s*(\w+)\s*(,\s*\w+\s*)*,?|\[?\s*(\w+)\s*(,\s*\w+\s*)*])?""")

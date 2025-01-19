@@ -1,17 +1,28 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.sponge.reference
 
 import com.demonwav.mcdev.insight.uastEventListener
 import com.demonwav.mcdev.platform.sponge.util.SpongeConstants
+import com.demonwav.mcdev.util.runCatchingKtIdeaExceptions
 import com.intellij.codeInsight.completion.JavaLookupElementBuilder
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.CommonClassNames
@@ -26,7 +37,7 @@ import com.intellij.psi.PsiReferenceContributor
 import com.intellij.psi.PsiReferenceProvider
 import com.intellij.psi.PsiReferenceRegistrar
 import com.intellij.psi.PsiSubstitutor
-import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 import com.intellij.psi.filters.ElementFilter
 import com.intellij.psi.filters.position.FilterPattern
 import com.intellij.util.ArrayUtil
@@ -46,7 +57,7 @@ class SpongeReferenceContributor : PsiReferenceContributor() {
             PlatformPatterns.psiElement(PsiLanguageInjectionHost::class.java)
                 .and(FilterPattern(GetterAnnotationFilter)),
             UastGetterEventListenerReferenceResolver,
-            PsiReferenceRegistrar.HIGHER_PRIORITY
+            PsiReferenceRegistrar.HIGHER_PRIORITY,
         )
     }
 }
@@ -67,7 +78,7 @@ private class GetterReference(element: PsiLanguageInjectionHost) : PsiReferenceB
     }
 
     override fun getVariants(): Array<Any> {
-        val literal = element.toUElementOfType<ULiteralExpression>() ?: return ArrayUtil.EMPTY_OBJECT_ARRAY
+        val literal = element.toUElement() ?: return ArrayUtil.EMPTY_OBJECT_ARRAY
         val (eventClass, _) = literal.uastEventListener
             ?: return ArrayUtil.EMPTY_OBJECT_ARRAY
         val methodByClass = mutableMapOf<String, Pair<PsiMethod, PsiClass>>()
@@ -88,7 +99,7 @@ private class GetterReference(element: PsiLanguageInjectionHost) : PsiReferenceB
 private object GetterAnnotationFilter : ElementFilter {
     override fun isAcceptable(element: Any, context: PsiElement?): Boolean {
         val type = context.toUElement() ?: return false
-        val annotation = type.getParentOfType<UAnnotation>() ?: return false
+        val annotation = runCatchingKtIdeaExceptions { type.getParentOfType<UAnnotation>() } ?: return false
         return annotation.qualifiedName == SpongeConstants.GETTER_ANNOTATION
     }
 
@@ -96,6 +107,6 @@ private object GetterAnnotationFilter : ElementFilter {
         PsiLanguageInjectionHost::class.java.isAssignableFrom(hintClass)
 }
 
-private fun isValidCandidate(method: PsiMethod): Boolean = method.returnType != PsiType.VOID &&
+private fun isValidCandidate(method: PsiMethod): Boolean = method.returnType != PsiTypes.voidType() &&
     !method.isConstructor && method.hasModifierProperty(PsiModifier.PUBLIC) && !method.hasParameters() &&
     method.containingClass?.qualifiedName != CommonClassNames.JAVA_LANG_OBJECT

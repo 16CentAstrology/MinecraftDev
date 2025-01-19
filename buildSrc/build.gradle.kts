@@ -1,15 +1,34 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     `kotlin-dsl`
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(8)
+}
+tasks.withType<KotlinCompile>().configureEach {
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 repositories {
@@ -18,6 +37,11 @@ repositories {
 }
 
 dependencies {
-    implementation("com.google.code.gson:gson:2.9.1")
-    implementation("org.cadixdev.licenser:org.cadixdev.licenser.gradle.plugin:0.6.1")
+    // hack for version catalogs
+    implementation(files(libs.javaClass.superclass.protectionDomain.codeSource.location))
+    implementation(libs.gson)
+    implementation(libs.kotlin.plugin)
+    implementation(libs.intellij.plugin)
+    implementation(libs.licenser.plugin)
+    implementation(libs.changelog.plugin)
 }

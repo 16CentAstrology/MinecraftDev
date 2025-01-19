@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.fabricloom
@@ -14,11 +24,12 @@ import com.demonwav.mcdev.platform.forge.inspections.sideonly.Side
 import com.demonwav.mcdev.platform.forge.inspections.sideonly.SideOnlyUtil
 import com.demonwav.mcdev.util.findModule
 import com.demonwav.mcdev.util.runGradleTaskWithCallback
+import com.demonwav.mcdev.util.runWriteActionAndWait
 import com.intellij.codeInsight.AttachSourcesProvider
-import com.intellij.openapi.application.runWriteActionAndWait
 import com.intellij.openapi.externalSystem.task.TaskCallback
 import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.OrderRootType
+import com.intellij.openapi.roots.impl.libraries.LibraryEx
 import com.intellij.openapi.util.ActionCallback
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiJavaFile
@@ -28,7 +39,7 @@ import org.jetbrains.plugins.gradle.util.GradleUtil
 class FabricLoomDecompileSourceProvider : AttachSourcesProvider {
     override fun getActions(
         orderEntries: List<LibraryOrderEntry>,
-        psiFile: PsiFile
+        psiFile: PsiFile,
     ): Collection<AttachSourcesProvider.AttachSourcesAction> {
         if (psiFile !is PsiJavaFile || !psiFile.packageName.startsWith("net.minecraft")) {
             return emptyList()
@@ -82,7 +93,7 @@ class FabricLoomDecompileSourceProvider : AttachSourcesProvider {
                 project,
                 Paths.get(projectPath),
                 { settings -> settings.taskNames = listOf(decompiler.taskName) },
-                taskCallback
+                taskCallback,
             )
             return callback
         }
@@ -93,6 +104,10 @@ class FabricLoomDecompileSourceProvider : AttachSourcesProvider {
                 val library = libraryEntry.library
                 if (library != null) {
                     runWriteActionAndWait {
+                        if (library is LibraryEx && library.isDisposed) {
+                            return@runWriteActionAndWait
+                        }
+
                         val model = library.modifiableModel
                         model.addRoot("jar://$sourcePath!/", OrderRootType.SOURCES)
                         model.commit()

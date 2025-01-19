@@ -1,19 +1,33 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.gradle
 
 import com.demonwav.mcdev.platform.mcp.gradle.datahandler.McpModelFG2Handler
 import com.demonwav.mcdev.platform.mcp.gradle.datahandler.McpModelFG3Handler
+import com.demonwav.mcdev.platform.mcp.gradle.datahandler.McpModelNG7Handler
+import com.demonwav.mcdev.platform.mcp.gradle.datahandler.McpModelNMDHandler
 import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelFG2
 import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelFG3
+import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelNG7
+import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelNMD
 import com.demonwav.mcdev.util.runGradleTask
 import com.intellij.openapi.externalSystem.model.DataNode
 import com.intellij.openapi.externalSystem.model.project.ModuleData
@@ -26,7 +40,7 @@ class McpProjectResolverExtension : AbstractProjectResolverExtension() {
 
     // Register our custom Gradle tooling API model in IntelliJ's project resolver
     override fun getExtraProjectModelClasses(): Set<Class<out Any>> =
-        setOf(McpModelFG2::class.java, McpModelFG3::class.java)
+        setOf(McpModelFG2::class.java, McpModelFG3::class.java, McpModelNG7::class.java, McpModelNMD::class.java)
 
     override fun getToolingExtensionsClasses() = extraProjectModelClasses
 
@@ -45,7 +59,7 @@ class McpProjectResolverExtension : AbstractProjectResolverExtension() {
 
         val projectDirPath = Paths.get(projectDataNode.data.linkedExternalProjectPath)
         runGradleTask(project, projectDirPath) { settings ->
-            settings.taskNames = allTaskNames
+            settings.taskNames = allTaskNames.distinct()
         }
 
         super.resolveFinished(projectDataNode)
@@ -79,6 +93,6 @@ class McpProjectResolverExtension : AbstractProjectResolverExtension() {
     }
 
     companion object {
-        private val handlers = listOf(McpModelFG2Handler, McpModelFG3Handler)
+        private val handlers = listOf(McpModelFG2Handler, McpModelFG3Handler, McpModelNG7Handler, McpModelNMDHandler)
     }
 }

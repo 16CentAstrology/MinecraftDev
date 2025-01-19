@@ -1,32 +1,39 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.forge.inspections.simpleimpl
 
+import com.demonwav.mcdev.util.findContainingClass
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.JavaPsiFacade
-import com.intellij.psi.PsiClass
-import com.intellij.structuralsearch.plugin.util.SmartPsiPointer
 import com.siyeh.ig.InspectionGadgetsFix
 
-class AddEmptyConstructorInspectionGadgetsFix(element: PsiClass, private val name: String) : InspectionGadgetsFix() {
+object AddEmptyConstructorInspectionGadgetsFix : InspectionGadgetsFix() {
 
-    private val pointer: SmartPsiPointer = SmartPsiPointer(element)
-
-    override fun doFix(project: Project, descriptor: ProblemDescriptor?) {
-        val clazz = pointer.element as? PsiClass ?: return
+    override fun doFix(project: Project, descriptor: ProblemDescriptor) {
+        val clazz = descriptor.psiElement.findContainingClass() ?: return
         clazz.addBefore(JavaPsiFacade.getElementFactory(project).createConstructor(), clazz.methods[0])
     }
 
-    override fun getName() = name
+    override fun getName() = "Add empty constructor"
 
     override fun getFamilyName() = name
 }

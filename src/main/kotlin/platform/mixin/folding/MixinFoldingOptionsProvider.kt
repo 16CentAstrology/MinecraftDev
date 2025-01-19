@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.folding
@@ -23,28 +33,38 @@ class MixinFoldingOptionsProvider :
         checkBox(
             "Target descriptors",
             { settings.state.foldTargetDescriptors },
-            { b -> settings.state.foldTargetDescriptors = b }
+            { b -> settings.state.foldTargetDescriptors = b },
         )
         checkBox("Object casts", { settings.state.foldObjectCasts }, { b -> settings.state.foldObjectCasts = b })
         checkBox(
             "Invoker casts",
             { settings.state.foldInvokerCasts },
-            { b -> settings.state.foldInvokerCasts = b }
+            { b -> settings.state.foldInvokerCasts = b },
         )
         checkBox(
             "Invoker method calls",
             { settings.state.foldInvokerMethodCalls },
-            { b -> settings.state.foldInvokerMethodCalls = b }
+            { b -> settings.state.foldInvokerMethodCalls = b },
         )
         checkBox(
             "Accessor casts",
             { settings.state.foldAccessorCasts },
-            { b -> settings.state.foldAccessorCasts = b }
+            { b -> settings.state.foldAccessorCasts = b },
         )
         checkBox(
             "Accessor method calls",
             { settings.state.foldAccessorMethodCalls },
-            { b -> settings.state.foldAccessorMethodCalls = b }
+            { b -> settings.state.foldAccessorMethodCalls = b },
+        )
+        checkBox(
+            "Fold MixinExtras expression definitions",
+            { settings.state.foldDefinitions },
+            { b -> settings.state.foldDefinitions = b },
+        )
+        checkBox(
+            "Fold MixinExtras expression definition fields and methods",
+            { settings.state.foldDefinitionFieldsAndMethods },
+            { b -> settings.state.foldDefinitionFieldsAndMethods = b },
         )
     }
 }

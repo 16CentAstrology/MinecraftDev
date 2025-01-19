@@ -1,17 +1,29 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.insight
 
 import com.demonwav.mcdev.MinecraftSettings
 import com.demonwav.mcdev.asset.GeneralAssets
+import com.demonwav.mcdev.asset.MCDevBundle
+import com.demonwav.mcdev.util.runCatchingKtIdeaExceptions
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler
 import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.LineMarkerProviderDescriptor
@@ -41,19 +53,11 @@ class ListenerLineMarkerProvider : LineMarkerProviderDescriptor() {
             return null
         }
 
-        try {
+        runCatchingKtIdeaExceptions {
             val identifier = element.toUElementOfType<UIdentifier>() ?: return null
             if (identifier.uastParent !is UMethod || identifier.uastEventListener == null) {
                 return null
             }
-        } catch (e: Exception) {
-            // Kotlin plugin is buggy and can throw exceptions here
-            // We do the check like this because we don't actually have this class on the classpath
-            if (e.javaClass.name == "org.jetbrains.kotlin.idea.caches.resolve.KotlinIdeaResolutionException") {
-                return null
-            }
-            // Don't swallow unexpected errors
-            throw e
         }
 
         // By this point, we can guarantee that the action of "go to declaration" will work
@@ -63,7 +67,7 @@ class ListenerLineMarkerProvider : LineMarkerProviderDescriptor() {
             element,
             element.textRange,
             icon,
-            createHandler()
+            createHandler(),
         )
     }
 
@@ -73,26 +77,28 @@ class ListenerLineMarkerProvider : LineMarkerProviderDescriptor() {
         return GutterIconNavigationHandler handler@{ _, element ->
             val (eventClass, _) = element.toUElementOfType<UIdentifier>()?.uastEventListener ?: return@handler
             FeatureUsageTracker.getInstance().triggerFeatureUsed("navigation.goto.declaration")
-            eventClass.navigate(true)
+            if (eventClass.canNavigate()) {
+                eventClass.navigate(true)
+            }
         }
     }
 
-    override fun getName() = "Event Listener line marker"
+    override fun getName() = MCDevBundle("insight.event_listener.marker")
     override fun getIcon() = GeneralAssets.LISTENER
 
-    private class EventLineMarkerInfo constructor(
+    private class EventLineMarkerInfo(
         element: PsiElement,
         range: TextRange,
         icon: Icon,
-        handler: GutterIconNavigationHandler<PsiElement>
+        handler: GutterIconNavigationHandler<PsiElement>,
     ) : MergeableLineMarkerInfo<PsiElement>(
         element,
         range,
         icon,
-        Function { "Go to Event declaration" },
+        Function { MCDevBundle("insight.event_listener.marker.goto") },
         handler,
         GutterIconRenderer.Alignment.RIGHT,
-        { "event listener indicator" }
+        { MCDevBundle("insight.event_listener.marker.accessible_name") },
     ) {
 
         override fun canMergeWith(info: MergeableLineMarkerInfo<*>): Boolean {
@@ -108,7 +114,7 @@ class ListenerLineMarkerProvider : LineMarkerProviderDescriptor() {
         override fun getCommonIcon(infos: List<MergeableLineMarkerInfo<*>>) = myIcon!!
 
         override fun getCommonTooltip(infos: List<MergeableLineMarkerInfo<*>>): Function<in PsiElement, String> =
-            Function { "Multiple method overrides" }
+            Function { MCDevBundle("insight.event_listener.marker.multiple") }
 
         override fun getElementPresentation(element: PsiElement): String {
             val parent = element.parent

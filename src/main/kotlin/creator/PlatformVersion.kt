@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.creator
@@ -13,6 +23,8 @@ package com.demonwav.mcdev.creator
 import com.demonwav.mcdev.platform.PlatformType
 import com.demonwav.mcdev.update.PluginUtil
 import com.demonwav.mcdev.util.fromJson
+import com.demonwav.mcdev.util.mapFirstNotNull
+import com.demonwav.mcdev.util.withSuppressed
 import com.github.kittinunf.fuel.core.FuelManager
 import com.github.kittinunf.fuel.core.requests.suspendable
 import com.github.kittinunf.fuel.coroutines.awaitString
@@ -23,11 +35,22 @@ import com.intellij.util.proxy.CommonProxy
 import java.io.IOException
 import java.net.Proxy
 import java.net.URI
-import javax.swing.JComboBox
 import kotlin.reflect.KClass
 
-private const val CLOUDFLARE_BASE_URL = "https://minecraftdev.org/versions/"
+// Cloudflare and GitHub are both global CDNs
+// Cloudflare is used first / preferred simply due to domain preference
+private const val CLOUDFLARE_BASE_URL = "https://mcdev.io/versions/"
+// Directly retrieving the file via GitHub is the second option. In some regions / networks Cloudflare is blocked,
+// but we may still be able to reach GitHub
 private const val GITHUB_BASE_URL = "https://raw.githubusercontent.com/minecraft-dev/minecraftdev.org/master/versions/"
+// Finally, there are apparently also regions / networks where both Cloudflare and GitHub is blocked.
+// Or maybe the domain `mcdev.io` (and prior to that, `minecraftdev.org`) is blocked due to weird domain
+// rules (perhaps blocking on the word "minecraft"). In one last ditch effort to retrieve the version json
+// we can also pull from this host, a separate host using a separate domain. This is an OVH server, not
+// proxied through Cloudflare.
+private const val OVH_BASE_URL = "https://versions.denwav.com/versions/"
+
+private val URLS = listOf(CLOUDFLARE_BASE_URL, GITHUB_BASE_URL, OVH_BASE_URL)
 
 val PLATFORM_VERSION_LOGGER = logger<PlatformVersion>()
 
@@ -53,19 +76,16 @@ suspend fun <T : Any> getVersionJson(path: String, type: KClass<T>): T {
 }
 
 suspend fun getText(path: String): String {
-    return try {
-        // attempt cloudflare
-        doCall(CLOUDFLARE_BASE_URL + path)
-    } catch (e: IOException) {
-        PLATFORM_VERSION_LOGGER.warn("Failed to reach cloudflare URL ${CLOUDFLARE_BASE_URL + path}", e)
-        // if that fails, attempt github
+    var thrown: Exception? = null
+    return URLS.mapFirstNotNull { url ->
         try {
-            doCall(GITHUB_BASE_URL + path)
-        } catch (e: IOException) {
-            PLATFORM_VERSION_LOGGER.warn("Failed to reach fallback GitHub URL ${GITHUB_BASE_URL + path}", e)
-            throw e
+            doCall(url + path)
+        } catch (e: Exception) {
+            PLATFORM_VERSION_LOGGER.warn("Failed to reach URL $url$path")
+            thrown = withSuppressed(thrown, e)
+            null
         }
-    }
+    } ?: throw thrown!!
 }
 
 private suspend fun doCall(urlText: String): String {
@@ -93,12 +113,4 @@ fun selectProxy(urlText: String): Proxy? {
     return null
 }
 
-data class PlatformVersion(var versions: List<String>, var selectedIndex: Int) {
-    fun set(combo: JComboBox<String>) {
-        combo.removeAllItems()
-        for (version in this.versions) {
-            combo.addItem(version)
-        }
-        combo.selectedIndex = this.selectedIndex
-    }
-}
+data class PlatformVersion(var versions: List<String>, var selectedIndex: Int)

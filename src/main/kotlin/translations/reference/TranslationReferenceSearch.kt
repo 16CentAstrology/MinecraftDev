@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.reference
@@ -14,18 +24,27 @@ import com.demonwav.mcdev.translations.TranslationFiles
 import com.intellij.find.FindModel
 import com.intellij.find.impl.FindInProjectUtil
 import com.intellij.openapi.application.runReadAction
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReference
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.usages.FindUsagesProcessPresentation
 import com.intellij.usages.UsageViewPresentation
 import com.intellij.util.Processor
 import com.intellij.util.QueryExecutor
+import com.intellij.util.application
 
 class TranslationReferenceSearch : QueryExecutor<PsiReference, ReferencesSearch.SearchParameters> {
     override fun execute(parameters: ReferencesSearch.SearchParameters, consumer: Processor<in PsiReference>): Boolean {
-        val entry = parameters.elementToSearch
+        if (application.isReadAccessAllowed) {
+            // Skip when we're in a read action because FindInProjectUtil.findUsages forbids it
+            // I am unsure why we are in a read action sometimes, thankfully references still seem to resolve correctly
+            return true
+        }
 
-        val key = runReadAction { TranslationFiles.toTranslation(entry)?.key } ?: return true
+        val key = runReadAction {
+            val searchElement = parameters.elementToSearch.takeIf(PsiElement::isValid)
+            searchElement?.let(TranslationFiles::toTranslation)?.key
+        } ?: return true
 
         fun <A> power(start: List<A>): Set<List<A>> {
             tailrec fun pwr(s: List<A>, acc: Set<List<A>>): Set<List<A>> =
@@ -48,24 +67,22 @@ class TranslationReferenceSearch : QueryExecutor<PsiReference, ReferencesSearch.
             .filter { it.isNotEmpty() }
             .joinToString("|") { "(${Regex.escape(it)})" }
 
-        runReadAction {
-            FindInProjectUtil.findUsages(
-                model,
-                parameters.project,
-                {
-                    if (it.file != null && it.element != null && it.rangeInElement != null) {
-                        val highlighted = it.file?.findElementAt(it.rangeInElement!!.startOffset)
-                        val ref = highlighted?.parent?.references
-                            ?.find { ref -> ref is TranslationReference } as TranslationReference?
-                        if (ref?.key?.full == key) {
-                            consumer.process(ref)
-                        }
+        FindInProjectUtil.findUsages(
+            model,
+            parameters.project,
+            {
+                if (it.file != null && it.element != null && it.rangeInElement != null) {
+                    val highlighted = it.file?.findElementAt(it.rangeInElement!!.startOffset)
+                    val ref = highlighted?.parent?.references
+                        ?.find { ref -> ref is TranslationReference } as TranslationReference?
+                    if (ref?.key?.full == key) {
+                        consumer.process(ref)
                     }
-                    true
-                },
-                FindUsagesProcessPresentation(UsageViewPresentation())
-            )
-        }
+                }
+                true
+            },
+            FindUsagesProcessPresentation(UsageViewPresentation()),
+        )
         return true
     }
 }

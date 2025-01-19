@@ -1,34 +1,40 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.identification
 
 import com.intellij.codeInsight.completion.CompletionUtilCore
-import com.intellij.psi.PsiLiteralExpression
+import org.jetbrains.uast.ULiteralExpression
 
-class LiteralTranslationIdentifier : TranslationIdentifier<PsiLiteralExpression>() {
-    override fun identify(element: PsiLiteralExpression): TranslationInstance? {
-        val statement = element.parent
-        if (element.value is String) {
-            val result = identify(element.project, element, statement, element)
-            return result?.copy(
-                key = result.key.copy(
-                    infix = result.key.infix.replace(
-                        CompletionUtilCore.DUMMY_IDENTIFIER_TRIMMED,
-                        ""
-                    )
-                )
-            )
+class LiteralTranslationIdentifier : TranslationIdentifier<ULiteralExpression>() {
+    override fun identify(element: ULiteralExpression): TranslationInstance? {
+        val statement = element.uastParent ?: return null
+        if (element.value !is String) {
+            return null
         }
-        return null
+
+        val project = element.sourcePsi?.project ?: return null
+        val result = identify(project, element, statement, element) ?: return null
+        val infix = result.key.infix.replace(CompletionUtilCore.DUMMY_IDENTIFIER_TRIMMED, "")
+        return result.copy(key = result.key.copy(infix = infix))
     }
 
-    override fun elementClass(): Class<PsiLiteralExpression> = PsiLiteralExpression::class.java
+    override fun elementClass(): Class<ULiteralExpression> = ULiteralExpression::class.java
 }

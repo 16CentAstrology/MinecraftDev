@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.at
@@ -24,7 +34,7 @@ class AtCommenterTest : CommenterTest() {
 
     private fun doTest(
         @Language("Access Transformers") before: String,
-        @Language("Access Transformers") after: String
+        @Language("Access Transformers") after: String,
     ) {
         doTest(before, after, "_at.cfg", ProjectBuilder::at)
     }
@@ -39,7 +49,7 @@ class AtCommenterTest : CommenterTest() {
         """
         #public net.minecraft.entity.Entity field_190534_ay # fire
         public net.minec<caret>raft.entity.Entity field_70152_a # nextEntityID
-        """
+        """,
     )
 
     @Test
@@ -54,7 +64,7 @@ class AtCommenterTest : CommenterTest() {
         #public net.minecraft.command.CommandHandler func<selection>_71559_a([Ljava/lang/String;)[Ljava/lang/String; # dropFirstString
         #public net.minecraft.command.CommandHandler func_82370_a(Lnet/minecraft/command/ICommand;[Ljava/lang</selection>/String;)I # getUsernameIndex
         public net.minecraft.command.EntitySelector func_82381_h(Ljava/lang/String;)Ljava/util/Map; # getArgumentMap
-        """
+        """,
     )
 
     @Test
@@ -71,7 +81,7 @@ class AtCommenterTest : CommenterTest() {
         #public net.minecraft.entity.Entity func_190531_bD()I
         #public net.<caret>minecraft.entity.EntityHanging func_174859_a(Lnet/minecraft/util/EnumFacing;)V # updateFacingWithBoundingBox
         #public net.minecraft.entity.EntityList field_180126_g # stringToIDMapping
-        """
+        """,
     )
 
     @Test
@@ -86,7 +96,7 @@ class AtCommenterTest : CommenterTest() {
         public net.minecraft<selection>.entity.EntityLivingBase field_70752_e # potionsNeedUpdate
         publi</selection>c net.minecraft.entity.EntityLivingBase field_70755_b # entityLivingToAttack
         public net.minecraft.entity.EntityLivingBase func_184583_d(Lnet/minecraft/util/DamageSource;)Z # canBlockDamageSource
-        """
+        """,
     )
 
     @Test
@@ -105,6 +115,6 @@ class AtCommenterTest : CommenterTest() {
         #public net.minecraft.entity.EntityLivingBase field_184633_f # POTION_EFFECTS
         ##public net.minecraft.entity.EntityLivingBase field_184634_g # HIDE_PARTICLES
         ##public net.minecraft.entity.EntityLivingBase field_184635_h # </selection>ARROW_COUNT_IN_ENTITY
-        """
+        """,
     )
 }

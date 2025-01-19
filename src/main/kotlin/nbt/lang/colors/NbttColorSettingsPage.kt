@@ -1,16 +1,39 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.nbt.lang.colors
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.asset.PlatformAssets
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.BYTE
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.DOUBLE
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.FLOAT
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.INT
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.KEYWORD
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.LONG
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.MATERIAL
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.SHORT
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.STRING
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.STRING_NAME
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.UNQUOTED_STRING
+import com.demonwav.mcdev.nbt.lang.colors.NbttSyntaxHighlighter.Companion.UNQUOTED_STRING_NAME
 import com.intellij.openapi.options.colors.AttributesDescriptor
 import com.intellij.openapi.options.colors.ColorDescriptor
 import com.intellij.openapi.options.colors.ColorSettingsPage
@@ -22,7 +45,7 @@ class NbttColorSettingsPage : ColorSettingsPage {
     override fun getAdditionalHighlightingTagToDescriptorMap() = map
     override fun getAttributeDescriptors() = DESCRIPTORS
     override fun getColorDescriptors(): Array<out ColorDescriptor> = ColorDescriptor.EMPTY_ARRAY
-    override fun getDisplayName() = "NBT Text"
+    override fun getDisplayName() = MCDevBundle("nbt.lang.display_name")
     override fun getDemoText() =
         """
         <name>"Level"</name>: {
@@ -65,24 +88,30 @@ class NbttColorSettingsPage : ColorSettingsPage {
 
     companion object {
         private val DESCRIPTORS = arrayOf(
-            AttributesDescriptor("Keyword", NbttSyntaxHighlighter.KEYWORD),
-            AttributesDescriptor("String", NbttSyntaxHighlighter.STRING),
-            AttributesDescriptor("Unquoted String", NbttSyntaxHighlighter.UNQUOTED_STRING),
-            AttributesDescriptor("Name", NbttSyntaxHighlighter.STRING_NAME),
-            AttributesDescriptor("Unquoted Name", NbttSyntaxHighlighter.UNQUOTED_STRING_NAME),
-            AttributesDescriptor("Byte", NbttSyntaxHighlighter.BYTE),
-            AttributesDescriptor("Short", NbttSyntaxHighlighter.SHORT),
-            AttributesDescriptor("Int", NbttSyntaxHighlighter.INT),
-            AttributesDescriptor("Long", NbttSyntaxHighlighter.LONG),
-            AttributesDescriptor("Float", NbttSyntaxHighlighter.FLOAT),
-            AttributesDescriptor("Double", NbttSyntaxHighlighter.DOUBLE),
-            AttributesDescriptor("Material", NbttSyntaxHighlighter.MATERIAL)
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.keyword.display_name"), KEYWORD),
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.string.display_name"), STRING),
+            AttributesDescriptor(
+                MCDevBundle.pointer("nbt.lang.highlighting.unquoted_string.display_name"),
+                UNQUOTED_STRING
+            ),
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.name.display_name"), STRING_NAME),
+            AttributesDescriptor(
+                MCDevBundle.pointer("nbt.lang.highlighting.unquoted_name.display_name"),
+                UNQUOTED_STRING_NAME
+            ),
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.byte.display_name"), BYTE),
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.short.display_name"), SHORT),
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.int.display_name"), INT),
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.long.display_name"), LONG),
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.float.display_name"), FLOAT),
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.double.display_name"), DOUBLE),
+            AttributesDescriptor(MCDevBundle.pointer("nbt.lang.highlighting.material.display_name"), MATERIAL),
         )
 
         private val map = mapOf(
             "name" to NbttSyntaxHighlighter.STRING_NAME,
             "uname" to NbttSyntaxHighlighter.UNQUOTED_STRING_NAME,
-            "material" to NbttSyntaxHighlighter.MATERIAL
+            "material" to NbttSyntaxHighlighter.MATERIAL,
         )
     }
 }

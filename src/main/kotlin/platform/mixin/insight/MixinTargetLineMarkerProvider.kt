@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.insight
@@ -18,7 +28,7 @@ import com.intellij.codeInsight.daemon.GutterIconNavigationHandler
 import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.LineMarkerProviderDescriptor
 import com.intellij.codeInsight.hint.HintManager
-import com.intellij.codeInsight.navigation.NavigationUtil
+import com.intellij.codeInsight.navigation.getPsiElementPopup
 import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.psi.PsiAnnotation
@@ -70,14 +80,14 @@ class MixinTargetLineMarkerProvider : LineMarkerProviderDescriptor() {
             { "Go to the $simpleName target" },
             MixinGutterIconNavigationHandler(identifier.createSmartPointer(), annotation.createSmartPointer(), handler),
             GutterIconRenderer.Alignment.LEFT,
-            { "mixin $simpleName target indicator" }
+            { "mixin $simpleName target indicator" },
         )
     }
 
     private class MixinGutterIconNavigationHandler(
         private val identifierPointer: SmartPsiElementPointer<PsiIdentifier>,
         private val annotationPointer: SmartPsiElementPointer<PsiAnnotation>,
-        private val handler: MixinAnnotationHandler
+        private val handler: MixinAnnotationHandler,
     ) : GutterIconNavigationHandler<PsiIdentifier> {
         override fun navigate(e: MouseEvent, elt: PsiIdentifier) {
             val element = identifierPointer.element ?: return
@@ -92,7 +102,7 @@ class MixinTargetLineMarkerProvider : LineMarkerProviderDescriptor() {
                     if (editor != null) {
                         HintManager.getInstance().showErrorHint(
                             editor,
-                            "Cannot find corresponding element in source code"
+                            "Cannot find corresponding element in source code",
                         )
                     }
                 }
@@ -101,10 +111,10 @@ class MixinTargetLineMarkerProvider : LineMarkerProviderDescriptor() {
                 }
                 else -> {
                     if (editor != null) {
-                        NavigationUtil.getPsiElementPopup(targets.toTypedArray(), "Choose Target")
+                        getPsiElementPopup(targets.toTypedArray(), "Choose Target")
                             .showInBestPositionFor(editor)
                     } else {
-                        NavigationUtil.getPsiElementPopup(targets.toTypedArray(), "Choose Target")
+                        getPsiElementPopup(targets.toTypedArray(), "Choose Target")
                             .show(RelativePoint(e))
                     }
                 }

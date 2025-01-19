@@ -1,15 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.nbt.lang.psi
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.nbt.MalformedNbtFileException
 import com.demonwav.mcdev.nbt.lang.gen.psi.NbttByte
 import com.demonwav.mcdev.nbt.lang.gen.psi.NbttByteArray
@@ -41,6 +52,6 @@ fun NbttTag.getNbtTag(): NbtTag {
         NbtTypeId.COMPOUND -> (getTag() as NbttCompound).getCompoundTag()
         NbtTypeId.INT_ARRAY -> (getTag() as NbttIntArray).getIntArrayTag()
         NbtTypeId.LONG_ARRAY -> (getTag() as NbttLongArray).getLongArrayTag()
-        else -> throw MalformedNbtFileException("Unknown error")
+        else -> throw MalformedNbtFileException(MCDevBundle("nbt.lang.errors.unknown"))
     }
 }

@@ -1,16 +1,25 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.action
 
-import com.demonwav.mcdev.asset.MixinAssets
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants
 import com.demonwav.mcdev.platform.mixin.util.mixinTargets
 import com.demonwav.mcdev.util.cached
@@ -28,7 +37,8 @@ import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.runBackgroundableTask
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.wm.RegisterToolWindowTask
+import com.intellij.openapi.wm.ToolWindow
+import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClass
@@ -39,13 +49,18 @@ import com.intellij.ui.content.ContentFactory
 
 class FindMixinsAction : AnAction() {
 
+    class TWFactory : ToolWindowFactory {
+        override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+        }
+    }
+
     companion object {
         private const val TOOL_WINDOW_ID = "Find Mixins"
 
         fun findMixins(
             clazz: PsiClass,
             project: Project,
-            indicator: ProgressIndicator? = null
+            indicator: ProgressIndicator? = null,
         ): List<PsiClass>? {
             return clazz.cached(PsiModificationTracker.MODIFICATION_COUNT) {
                 val targetInternalName = clazz.fullQualifiedName?.replace('.', '/')
@@ -53,13 +68,13 @@ class FindMixinsAction : AnAction() {
 
                 val mixinAnnotation = JavaPsiFacade.getInstance(project).findClass(
                     MixinConstants.Annotations.MIXIN,
-                    GlobalSearchScope.allScope(project)
+                    GlobalSearchScope.allScope(project),
                 ) ?: return@cached null
 
                 // Check all classes with the Mixin annotation
                 val classes = AnnotatedElementsSearch.searchPsiClasses(
                     mixinAnnotation,
-                    GlobalSearchScope.projectScope(project)
+                    GlobalSearchScope.projectScope(project),
                 )
                     .filter {
                         indicator?.text = "Checking ${it.name}..."
@@ -108,14 +123,10 @@ class FindMixinsAction : AnAction() {
                         gotoTargetElement(classes.single(), editor, file)
                     } else {
                         val twManager = ToolWindowManager.getInstance(project)
-                        val window = twManager.getToolWindow(TOOL_WINDOW_ID) ?: run {
-                            val task =
-                                RegisterToolWindowTask.closable(TOOL_WINDOW_ID, icon = MixinAssets.MIXIN_CLASS_ICON)
-                            twManager.registerToolWindow(task)
-                        }
-
+                        val window = twManager.getToolWindow(TOOL_WINDOW_ID)!!
                         val component = FindMixinsComponent(classes)
-                        val content = ContentFactory.SERVICE.getInstance().createContent(component.panel, null, false)
+                        val content = ContentFactory.getInstance().createContent(component.panel, null, false)
+                        content.displayName = classOfElement.qualifiedName ?: classOfElement.name
                         window.contentManager.addContent(content)
 
                         window.activate(null)

@@ -1,18 +1,28 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.forge
 
 import com.demonwav.mcdev.asset.PlatformAssets
 import com.demonwav.mcdev.facet.MinecraftFacet
-import com.demonwav.mcdev.insight.generation.GenerationData
+import com.demonwav.mcdev.insight.generation.EventListenerGenerationSupport
 import com.demonwav.mcdev.inspection.IsCancelled
 import com.demonwav.mcdev.platform.AbstractModule
 import com.demonwav.mcdev.platform.PlatformType
@@ -21,8 +31,8 @@ import com.demonwav.mcdev.platform.forge.util.ForgeConstants
 import com.demonwav.mcdev.platform.mcp.McpModuleSettings
 import com.demonwav.mcdev.util.SemanticVersion
 import com.demonwav.mcdev.util.SourceType
-import com.demonwav.mcdev.util.extendsOrImplements
 import com.demonwav.mcdev.util.nullable
+import com.demonwav.mcdev.util.runCatchingKtIdeaExceptions
 import com.demonwav.mcdev.util.runWriteTaskLater
 import com.demonwav.mcdev.util.waitForAllSmart
 import com.intellij.json.JsonFileType
@@ -32,11 +42,9 @@ import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.project.DumbService
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiMethodCallExpression
-import com.intellij.psi.PsiType
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.AnnotatedElementsSearch
 import org.jetbrains.uast.UClass
@@ -51,6 +59,8 @@ class ForgeModule internal constructor(facet: MinecraftFacet) : AbstractModule(f
     override val moduleType = ForgeModuleType
     override val type = PlatformType.FORGE
     override val icon = PlatformAssets.FORGE_ICON
+
+    override val eventListenerGenSupport: EventListenerGenerationSupport = ForgeEventListenerGenerationSupport()
 
     override fun init() {
         ApplicationManager.getApplication().executeOnPooledThread {
@@ -117,7 +127,7 @@ class ForgeModule internal constructor(facet: MinecraftFacet) : AbstractModule(f
             return formatWrongEventMessage(
                 ForgeConstants.EVENTBUS_EVENT,
                 ForgeConstants.EVENTBUS_SUBSCRIBE_EVENT_ANNOTATION,
-                ForgeConstants.EVENTBUS_EVENT == eventClass.qualifiedName
+                ForgeConstants.EVENTBUS_EVENT == eventClass.qualifiedName,
             )
         }
 
@@ -127,14 +137,14 @@ class ForgeModule internal constructor(facet: MinecraftFacet) : AbstractModule(f
             return formatWrongEventMessage(
                 ForgeConstants.FML_EVENT,
                 ForgeConstants.SUBSCRIBE_EVENT_ANNOTATION,
-                ForgeConstants.EVENT == eventClass.qualifiedName
+                ForgeConstants.EVENT == eventClass.qualifiedName,
             )
         }
 
         return formatWrongEventMessage(
             ForgeConstants.EVENT,
             ForgeConstants.EVENT_HANDLER_ANNOTATION,
-            ForgeConstants.FML_EVENT == eventClass.qualifiedName
+            ForgeConstants.FML_EVENT == eventClass.qualifiedName,
         )
     }
 
@@ -148,47 +158,11 @@ class ForgeModule internal constructor(facet: MinecraftFacet) : AbstractModule(f
 
     override fun isStaticListenerSupported(method: PsiMethod) = true
 
-    override fun generateEventListenerMethod(
-        containingClass: PsiClass,
-        chosenClass: PsiClass,
-        chosenName: String,
-        data: GenerationData?
-    ): PsiMethod? {
-        val isFmlEvent = chosenClass.extendsOrImplements(ForgeConstants.FML_EVENT)
-
-        val method = JavaPsiFacade.getElementFactory(project).createMethod(chosenName, PsiType.VOID)
-        val parameterList = method.parameterList
-
-        val qName = chosenClass.qualifiedName ?: return null
-        val parameter = JavaPsiFacade.getElementFactory(project)
-            .createParameter(
-                "event",
-                PsiClassType.getTypeByName(qName, project, GlobalSearchScope.allScope(project))
-            )
-
-        parameterList.add(parameter)
-        val modifierList = method.modifierList
-
-        if (isFmlEvent) {
-            modifierList.addAnnotation(ForgeConstants.EVENT_HANDLER_ANNOTATION)
-        } else {
-            val mcVersion = McpModuleSettings.getInstance(module).state.minecraftVersion
-                ?.let { SemanticVersion.parse(it) }
-            if (mcVersion != null && mcVersion >= ForgeModuleType.FG3_MC_VERSION) {
-                modifierList.addAnnotation(ForgeConstants.EVENTBUS_SUBSCRIBE_EVENT_ANNOTATION)
-            } else {
-                modifierList.addAnnotation(ForgeConstants.SUBSCRIBE_EVENT_ANNOTATION)
-            }
-        }
-
-        return method
-    }
-
     override fun shouldShowPluginIcon(element: PsiElement?): Boolean {
         val identifier = element?.toUElementOfType<UIdentifier>()
             ?: return false
 
-        val psiClass = identifier.uastParent as? UClass
+        val psiClass = runCatchingKtIdeaExceptions { identifier.uastParent as? UClass }
             ?: return false
 
         return !psiClass.hasModifier(JvmModifier.ABSTRACT) &&

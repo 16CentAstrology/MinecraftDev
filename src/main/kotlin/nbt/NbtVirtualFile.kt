@@ -1,22 +1,34 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.nbt
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.nbt.editor.CompressionSelection
 import com.demonwav.mcdev.nbt.editor.NbtToolbar
 import com.demonwav.mcdev.nbt.lang.NbttFile
-import com.demonwav.mcdev.nbt.lang.NbttFileType
 import com.demonwav.mcdev.nbt.lang.NbttLanguage
+import com.demonwav.mcdev.util.loggerForTopLevel
 import com.demonwav.mcdev.util.runReadActionAsync
 import com.demonwav.mcdev.util.runWriteTaskLater
+import com.intellij.lang.Language
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.fileEditor.impl.IdeDocumentHistoryImpl
@@ -30,42 +42,43 @@ import java.io.DataOutputStream
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPOutputStream
 
-class NbtVirtualFile(private val backingFile: VirtualFile, private val project: Project) :
-    LightVirtualFile(backingFile.name + ".nbtt", NbttFileType, ""),
-    IdeDocumentHistoryImpl.SkipFromDocumentHistory {
+private val LOG = loggerForTopLevel()
 
-    val isCompressed: Boolean
-    lateinit var toolbar: NbtToolbar
-    val parseSuccessful: Boolean
+fun NbtVirtualFile(backingFile: VirtualFile, project: Project): NbtVirtualFile {
+    var language: Language = NbttLanguage
 
-    init {
-        originalFile = backingFile
-        language = NbttLanguage
+    var text: String
+    var compressed: Boolean
+    var parseSuccessful: Boolean
 
-        var text: String
-        var tempCompressed: Boolean
-        var tempParseSuccessful: Boolean
-
-        try {
-            val (rootCompound, isCompressed) = Nbt.buildTagTree(backingFile.inputStream, TimeUnit.SECONDS.toMillis(10))
-            text = rootCompound.toString()
-            tempCompressed = isCompressed
-            tempParseSuccessful = true
-        } catch (e: MalformedNbtFileException) {
-            text = "Malformed NBT file:\n${e.message}"
-            tempCompressed = false
-            tempParseSuccessful = false
-        }
-
-        this.isCompressed = tempCompressed
-        this.parseSuccessful = tempParseSuccessful
-
-        if (!this.parseSuccessful) {
-            language = PlainTextLanguage.INSTANCE
-        }
-
-        setContent(this, text, false)
+    try {
+        val (rootCompound, isCompressed) = Nbt.buildTagTree(backingFile.inputStream, TimeUnit.SECONDS.toMillis(10))
+        text = rootCompound.toString()
+        compressed = isCompressed
+        parseSuccessful = true
+    } catch (e: MalformedNbtFileException) {
+        text = MCDevBundle("nbt.lang.errors.wrapped_error_message", e.message)
+        compressed = false
+        parseSuccessful = false
     }
+
+    if (!parseSuccessful) {
+        language = PlainTextLanguage.INSTANCE
+    }
+
+    return NbtVirtualFile(backingFile, project, language, text, compressed, parseSuccessful)
+}
+
+class NbtVirtualFile(
+    private val backingFile: VirtualFile,
+    private val project: Project,
+    language: Language,
+    text: String,
+    val isCompressed: Boolean,
+    val parseSuccessful: Boolean,
+) : LightVirtualFile(backingFile.name + ".nbtt", language, text), IdeDocumentHistoryImpl.SkipFromDocumentHistory {
+
+    lateinit var toolbar: NbtToolbar
 
     override fun refresh(asynchronous: Boolean, recursive: Boolean, postRunnable: Runnable?) {
         backingFile.refresh(asynchronous, recursive, postRunnable)
@@ -82,22 +95,33 @@ class NbtVirtualFile(private val backingFile: VirtualFile, private val project: 
             if (nbttFile == null) {
                 Notification(
                     "NBT Save Error",
-                    "Error saving NBT file",
-                    "The file is not recognised as a NBTT file. This might be caused by wrong file type associations," +
-                        " or the file could be too large.",
-                    NotificationType.WARNING
+                    MCDevBundle("nbt.file.save_notify.file_type_error.title"),
+                    MCDevBundle("nbt.file.save_notify.file_type_error.content"),
+                    NotificationType.WARNING,
                 ).notify(project)
                 return@runReadActionAsync
             }
 
-            val rootTag = nbttFile.getRootCompound()?.getRootCompoundTag()
+            val rootTagParseResult = runCatching { nbttFile.getRootCompound()?.getRootCompoundTag() }
 
+            if (rootTagParseResult.isFailure) {
+                val exception = rootTagParseResult.exceptionOrNull()
+                Notification(
+                    "NBT Save Error",
+                    MCDevBundle("nbt.file.save_notify.parse_exception.title"),
+                    MCDevBundle("nbt.file.save_notify.parse_exception.content", backingFile.name, exception),
+                    NotificationType.WARNING,
+                ).notify(project)
+                return@runReadActionAsync
+            }
+
+            val rootTag = rootTagParseResult.getOrNull()
             if (rootTag == null) {
                 Notification(
                     "NBT Save Error",
-                    "Error saving NBT file",
-                    "Due to errors in the text representation, ${backingFile.name} could not be saved.",
-                    NotificationType.WARNING
+                    MCDevBundle("nbt.file.save_notify.parse_error.title"),
+                    MCDevBundle("nbt.file.save_notify.parse_error.content", backingFile.name),
+                    NotificationType.WARNING,
                 ).notify(project)
                 return@runReadActionAsync
             }
@@ -116,9 +140,9 @@ class NbtVirtualFile(private val backingFile: VirtualFile, private val project: 
 
                 Notification(
                     "NBT Save Success",
-                    "Saved NBT file successfully",
-                    "${backingFile.name} was saved successfully.",
-                    NotificationType.INFORMATION
+                    MCDevBundle("nbt.file.save_notify.success.title"),
+                    MCDevBundle("nbt.file.save_notify.success.content", backingFile.name),
+                    NotificationType.INFORMATION,
                 ).notify(project)
             }
         }

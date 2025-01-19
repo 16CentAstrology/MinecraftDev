@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.inspection.overwrite
@@ -53,7 +63,7 @@ class OverwriteModifiersInspection : OverwriteInspection() {
                 modifierList.findKeyword(currentModifier) ?: nameIdentifier,
                 "$currentModifier @Overwrite cannot reduce visibility of " +
                     "${PsiUtil.getAccessModifier(targetAccessLevel)} target method",
-                QuickFixFactory.getInstance().createModifierListFix(modifierList, targetModifier, true, false)
+                QuickFixFactory.getInstance().createModifierListFix(modifierList, targetModifier, true, false),
             )
         }
 
@@ -64,6 +74,10 @@ class OverwriteModifiersInspection : OverwriteInspection() {
             }
             if (modifier == PsiModifier.DEFAULT) {
                 // default modifier is not present in bytecode
+                continue
+            }
+            if (modifier == PsiModifier.OPEN || modifier == PsiModifier.TRANSITIVE) {
+                // those are only used in module-info
                 continue
             }
 
@@ -82,7 +96,7 @@ class OverwriteModifiersInspection : OverwriteInspection() {
                 holder.registerProblem(
                     marker,
                     message,
-                    QuickFixFactory.getInstance().createModifierListFix(modifierList, modifier, targetModifier, false)
+                    QuickFixFactory.getInstance().createModifierListFix(modifierList, modifier, targetModifier, false),
                 )
             }
         }
@@ -101,13 +115,13 @@ class OverwriteModifiersInspection : OverwriteInspection() {
                         nameIdentifier,
                         "Missing @${internalNameToShortName(internalName)} annotation",
                         ProblemHighlightType.WARNING,
-                        AddAnnotationFix(qualifiedName, method, targetAnnPsi.parameterList.attributes)
+                        AddAnnotationFix(qualifiedName, method, targetAnnPsi.parameterList.attributes),
                     )
                 } else {
                     holder.registerProblem(
                         nameIdentifier,
                         "Missing @${internalNameToShortName(internalName)} annotation",
-                        ProblemHighlightType.WARNING
+                        ProblemHighlightType.WARNING,
                     )
                 }
             }

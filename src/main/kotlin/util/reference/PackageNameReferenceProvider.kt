@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util.reference
@@ -40,7 +50,7 @@ abstract class PackageNameReferenceProvider : PsiReferenceProvider() {
     protected open fun resolve(
         qualifiedName: String,
         element: PsiElement,
-        facade: JavaPsiFacade
+        facade: JavaPsiFacade,
     ): Array<ResolveResult> {
         facade.findPackage(qualifiedName)?.let { return arrayOf(PsiElementResolveResult(it)) }
         return ResolveResult.EMPTY_ARRAY
@@ -55,7 +65,7 @@ abstract class PackageNameReferenceProvider : PsiReferenceProvider() {
     protected inline fun collectPackageChildren(
         context: PsiPackage,
         classes: Iterable<PsiClass>,
-        classFunc: (PsiClass) -> Any?
+        classFunc: (PsiClass) -> Any?,
     ): Array<Any> {
         val parentPackage = context.qualifiedName
         val subPackageStart = parentPackage.length + 1
@@ -137,7 +147,7 @@ abstract class PackageNameReferenceProvider : PsiReferenceProvider() {
         private val qualifiedName: String
             get() {
                 val name = qualifiedRange.substring(element.text)
-                return getBasePackage(element)?.let { it + '.' + name } ?: name
+                return getBasePackage(element)?.let { "$it.$name" } ?: name
             }
 
         override val unresolved: Boolean
@@ -153,7 +163,7 @@ abstract class PackageNameReferenceProvider : PsiReferenceProvider() {
 
         private fun getNewName(newTarget: PsiQualifiedNamedElement): String {
             val newName = newTarget.qualifiedName!!
-            return getBasePackage(element)?.let { newName.removePrefix(it + '.') } ?: newName
+            return getBasePackage(element)?.let { newName.removePrefix("$it.") } ?: newName
         }
 
         override fun bindToElement(newTarget: PsiElement): PsiElement? {

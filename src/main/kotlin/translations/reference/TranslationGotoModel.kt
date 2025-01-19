@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.translations.reference
@@ -26,19 +36,19 @@ class TranslationGotoModel(project: Project, private val prefix: String, private
     ContributorsBasedGotoByModel(
         project,
         arrayOf(
-            ChooseByNameContributor.SYMBOL_EP_NAME.findExtensionOrFail(TranslationGotoSymbolContributor::class.java)
-        )
+            ChooseByNameContributor.SYMBOL_EP_NAME.findExtensionOrFail(TranslationGotoSymbolContributor::class.java),
+        ),
     ) {
     override fun acceptItem(item: NavigationItem?): Boolean {
         return TranslationFiles.getLocale(
-            (item as PsiElement).containingFile?.virtualFile
+            (item as PsiElement).containingFile?.virtualFile,
         ) == TranslationConstants.DEFAULT_LOCALE
     }
 
     override fun getElementsByName(
         name: String,
         parameters: FindSymbolParameters,
-        canceled: ProgressIndicator
+        canceled: ProgressIndicator,
     ): Array<Any> {
         val superResult = super.getElementsByName(name, parameters, canceled).asSequence()
         val result = TreeSet<PsiNamedElement> { o1, o2 ->
@@ -48,7 +58,7 @@ class TranslationGotoModel(project: Project, private val prefix: String, private
             superResult.map { it as PsiNamedElement }.filter {
                 val key = it.name ?: return@filter false
                 key.startsWith(prefix) && key.endsWith(suffix)
-            }
+            },
         )
         return result.toArray()
     }

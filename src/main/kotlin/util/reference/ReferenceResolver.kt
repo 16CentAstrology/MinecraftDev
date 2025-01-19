@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util.reference
@@ -15,7 +25,7 @@ import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.JavaPsiFacade
-import com.intellij.psi.PsiAnnotationMemberValue
+import com.intellij.psi.PsiArrayInitializerMemberValue
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiExpression
@@ -102,7 +112,7 @@ private fun PsiElement.findContextElement(): PsiElement {
     do {
         current = parent
         parent = current.parent
-        if (parent is PsiNameValuePair || parent is PsiAnnotationMemberValue) {
+        if (parent is PsiNameValuePair || parent is PsiArrayInitializerMemberValue) {
             return current
         }
     } while (parent is PsiExpression)
@@ -114,8 +124,11 @@ private fun PsiElement.findContextElement(): PsiElement {
  * Patches the [LookupElementBuilder] to replace the element with a single
  * [PsiLiteral] when using code completion.
  */
-fun LookupElementBuilder.completeToLiteral(context: PsiElement): LookupElementBuilder {
-    if (context is PsiLiteral) {
+fun LookupElementBuilder.completeToLiteral(
+    context: PsiElement,
+    extraAction: ((Editor, PsiLiteral) -> Unit)? = null
+): LookupElementBuilder {
+    if (context is PsiLiteral && extraAction == null) {
         // Context is already a literal
         return this
     }
@@ -124,14 +137,15 @@ fun LookupElementBuilder.completeToLiteral(context: PsiElement): LookupElementBu
     // not sure how you would keep line breaks after completion
     return withInsertHandler { insertionContext, item ->
         insertionContext.laterRunnable =
-            ReplaceElementWithLiteral(insertionContext.editor, insertionContext.file, item.lookupString)
+            ReplaceElementWithLiteral(insertionContext.editor, insertionContext.file, item.lookupString, extraAction)
     }
 }
 
 private class ReplaceElementWithLiteral(
     private val editor: Editor,
     private val file: PsiFile,
-    private val text: String
+    private val text: String,
+    private val extraAction: ((Editor, PsiLiteral) -> Unit)?
 ) : Runnable {
 
     override fun run() {
@@ -142,12 +156,16 @@ private class ReplaceElementWithLiteral(
         CommandProcessor.getInstance().runUndoTransparentAction {
             runWriteAction {
                 val element = file.findElementAt(editor.caretModel.offset)!!.findContextElement()
-                element.replace(
+                val newElement = element.replace(
                     JavaPsiFacade.getElementFactory(element.project).createExpressionFromText(
                         "\"$text\"",
-                        element.parent
-                    )
-                )
+                        element.parent,
+                    ),
+                ) as PsiLiteral
+                val extraAction = this.extraAction
+                if (extraAction != null) {
+                    extraAction(editor, newElement)
+                }
             }
         }
     }

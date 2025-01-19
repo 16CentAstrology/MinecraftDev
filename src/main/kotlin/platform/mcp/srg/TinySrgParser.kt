@@ -1,15 +1,26 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.srg
 
+import com.demonwav.mcdev.platform.mcp.mappings.Mappings
 import com.demonwav.mcdev.util.MemberReference
 import com.google.common.collect.ImmutableBiMap
 import com.intellij.openapi.util.registry.Registry
@@ -22,7 +33,7 @@ import net.fabricmc.mappingio.MappingVisitor
 object TinySrgParser : SrgParser {
     private val commentRegex = Regex("#.+")
 
-    override fun parseSrg(path: Path): McpSrgMap {
+    override fun parseSrg(path: Path): Mappings {
         val classMapBuilder = ImmutableBiMap.builder<String, String>()
         val fieldMapBuilder = ImmutableBiMap.builder<MemberReference, MemberReference>()
         val methodMapBuilder = ImmutableBiMap.builder<MemberReference, MemberReference>()
@@ -34,11 +45,12 @@ object TinySrgParser : SrgParser {
             oldParser(path, classMapBuilder, fieldMapBuilder, methodMapBuilder, srgNames)
         }
 
-        return McpSrgMap(
+        return Mappings(
             classMapBuilder.build(),
             fieldMapBuilder.build(),
             methodMapBuilder.build(),
-            srgNames
+            srgNames,
+            false,
         )
     }
 
@@ -47,7 +59,7 @@ object TinySrgParser : SrgParser {
         classMapBuilder: ImmutableBiMap.Builder<String, String>,
         fieldMapBuilder: ImmutableBiMap.Builder<MemberReference, MemberReference>,
         methodMapBuilder: ImmutableBiMap.Builder<MemberReference, MemberReference>,
-        srgNames: HashMap<String, String>
+        srgNames: HashMap<String, String>,
     ) {
         var classRef: Pair<String, String>? = null
 
@@ -93,7 +105,7 @@ object TinySrgParser : SrgParser {
         classMapBuilder: ImmutableBiMap.Builder<String, String>,
         fieldMapBuilder: ImmutableBiMap.Builder<MemberReference, MemberReference>,
         methodMapBuilder: ImmutableBiMap.Builder<MemberReference, MemberReference>,
-        srgNames: HashMap<String, String>
+        srgNames: HashMap<String, String>,
     ) {
         val visitor = object : MappingVisitor {
             var namedNsIndex = -1
@@ -144,15 +156,16 @@ object TinySrgParser : SrgParser {
                     else -> return
                 }
 
-                if (targetKind == MappedElementKind.CLASS && named != null) {
-                    classMapBuilder.put(cls, named!!.replace('/', '.'))
-                } else if (inter != null && named != null) {
+                if (targetKind == MappedElementKind.CLASS) {
+                    classMapBuilder.put(cls, name.replace('/', '.'))
+                } else if (inter != null) {
+                    val inter = inter!!
                     if (targetKind == MappedElementKind.FIELD) {
-                        fieldMapBuilder.put(MemberReference(inter!!, null, cls), MemberReference(named!!, null, cls))
-                        srgNames[inter!!] = named!!
+                        fieldMapBuilder.put(MemberReference(inter, null, cls), MemberReference(name, null, cls))
+                        srgNames[inter] = name
                     } else if (targetKind == MappedElementKind.METHOD) {
-                        methodMapBuilder.put(MemberReference(inter!!, desc, cls), MemberReference(named!!, desc, cls))
-                        srgNames[inter!!] = named!!
+                        methodMapBuilder.put(MemberReference(inter, desc, cls), MemberReference(name, desc, cls))
+                        srgNames[inter] = name
                     }
                 }
             }

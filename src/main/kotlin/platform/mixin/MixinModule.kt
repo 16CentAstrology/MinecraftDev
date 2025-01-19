@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin
@@ -15,13 +25,12 @@ import com.demonwav.mcdev.facet.MinecraftFacetDetector
 import com.demonwav.mcdev.platform.AbstractModule
 import com.demonwav.mcdev.platform.PlatformType
 import com.demonwav.mcdev.platform.mixin.config.MixinConfig
+import com.demonwav.mcdev.platform.mixin.config.MixinConfigFileType
 import com.demonwav.mcdev.platform.mixin.framework.MIXIN_LIBRARY_KIND
 import com.demonwav.mcdev.util.SemanticVersion
 import com.demonwav.mcdev.util.nullable
 import com.intellij.json.psi.JsonFile
 import com.intellij.json.psi.JsonObject
-import com.intellij.openapi.fileTypes.FileTypeManager
-import com.intellij.openapi.fileTypes.FileTypes
 import com.intellij.openapi.project.Project
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClass
@@ -44,24 +53,24 @@ class MixinModule(facet: MinecraftFacet) : AbstractModule(facet) {
     override val icon: Icon? = null
 
     companion object {
-        private val mixinFileType by lazy {
-            FileTypeManager.getInstance().findFileTypeByName("Mixin Configuration") ?: FileTypes.UNKNOWN
-        }
+        private val mixinFileTypes = listOf(MixinConfigFileType.Json, MixinConfigFileType.Json5)
 
         fun getMixinConfigs(
             project: Project,
-            scope: GlobalSearchScope
+            scope: GlobalSearchScope,
         ): Collection<MixinConfig> {
-            return FileTypeIndex.getFiles(mixinFileType, scope)
-                .mapNotNull {
-                    (PsiManager.getInstance(project).findFile(it) as? JsonFile)?.topLevelValue as? JsonObject
+            return mixinFileTypes
+                .flatMap { FileTypeIndex.getFiles(it, scope) }
+                .mapNotNull { file ->
+                    (PsiManager.getInstance(project).findFile(file) as? JsonFile)?.topLevelValue as? JsonObject
+                }.map { jsonObject ->
+                    MixinConfig(project, jsonObject)
                 }
-                .map { MixinConfig(project, it) }
         }
 
         fun getAllMixinClasses(
             project: Project,
-            scope: GlobalSearchScope
+            scope: GlobalSearchScope,
         ): Collection<PsiClass> {
             return getMixinConfigs(project, scope).asSequence()
                 .flatMap { (it.qualifiedMixins + it.qualifiedClient + it.qualifiedServer).asSequence() }
@@ -75,7 +84,7 @@ class MixinModule(facet: MinecraftFacet) : AbstractModule(facet) {
         fun getBestWritableConfigForMixinClass(
             project: Project,
             scope: GlobalSearchScope,
-            mixinClassName: String
+            mixinClassName: String,
         ): MixinConfig? {
             return getMixinConfigs(project, scope)
                 .filter { it.isWritable && mixinClassName.startsWith("${it.pkg}.") }
@@ -83,3 +92,4 @@ class MixinModule(facet: MinecraftFacet) : AbstractModule(facet) {
         }
     }
 }
+

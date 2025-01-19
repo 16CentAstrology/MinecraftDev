@@ -1,17 +1,28 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.util
 
 import com.demonwav.mcdev.util.internalName
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClassType
@@ -30,8 +41,8 @@ import org.objectweb.asm.tree.analysis.SimpleVerifier
 object AsmDfaUtil {
     private val LOGGER = thisLogger()
 
-    fun analyzeMethod(project: Project, clazz: ClassNode, method: MethodNode): Array<Frame<BasicValue>?>? {
-        return method.cached(clazz, project) {
+    fun analyzeMethod(project: Project, classIn: ClassNode, methodIn: MethodNode): Array<Frame<BasicValue>?>? {
+        return methodIn.cached(classIn, project) { clazz, method ->
             try {
                 Analyzer(
                     PsiBytecodeInterpreter(
@@ -39,10 +50,14 @@ object AsmDfaUtil {
                         Type.getObjectType(clazz.name),
                         clazz.superName?.let { Type.getObjectType(it) },
                         clazz.interfaces?.map { Type.getObjectType(it) } ?: emptyList(),
-                        clazz.hasAccess(Opcodes.ACC_INTERFACE)
-                    )
+                        clazz.hasAccess(Opcodes.ACC_INTERFACE),
+                    ),
                 ).analyze(clazz.name, method)
             } catch (e: AnalyzerException) {
+                val cause = e.cause
+                if (cause is ProcessCanceledException) {
+                    throw cause
+                }
                 LOGGER.warn("AsmDfaUtil.analyzeMethod failed", e)
                 null
             }
@@ -54,7 +69,7 @@ object AsmDfaUtil {
         clazz: ClassNode,
         method: MethodNode,
         insn: AbstractInsnNode,
-        slot: Int
+        slot: Int,
     ): Type? {
         val insns = method.instructions ?: return null
         val frames = analyzeMethod(project, clazz, method) ?: return null
@@ -67,7 +82,7 @@ object AsmDfaUtil {
         project: Project,
         clazz: ClassNode,
         method: MethodNode,
-        insn: AbstractInsnNode
+        insn: AbstractInsnNode,
     ): Array<Type?>? {
         val insns = method.instructions ?: return null
         val frames = analyzeMethod(project, clazz, method) ?: return null
@@ -80,7 +95,7 @@ object AsmDfaUtil {
         clazz: ClassNode,
         method: MethodNode,
         insn: AbstractInsnNode,
-        depth: Int
+        depth: Int,
     ): Type? {
         val insns = method.instructions ?: return null
         val frames = analyzeMethod(project, clazz, method) ?: return null
@@ -93,7 +108,7 @@ object AsmDfaUtil {
         project: Project,
         clazz: ClassNode,
         method: MethodNode,
-        insn: AbstractInsnNode
+        insn: AbstractInsnNode,
     ): Array<Type?>? {
         val insns = method.instructions ?: return null
         val frames = analyzeMethod(project, clazz, method) ?: return null
@@ -106,7 +121,7 @@ object AsmDfaUtil {
         private val currentClass: Type,
         private val currentSuperClass: Type?,
         currentClassInterfaces: List<Type>,
-        private val isInterface: Boolean
+        private val isInterface: Boolean,
     ) : SimpleVerifier(Opcodes.ASM7, currentClass, currentSuperClass, currentClassInterfaces, isInterface) {
         override fun getClass(type: Type?): Class<*> {
             // should never be called given we have overridden the other methods

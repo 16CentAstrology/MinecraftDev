@@ -1,52 +1,57 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.nbt.editor
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.nbt.NbtVirtualFile
 import com.demonwav.mcdev.util.runWriteTaskLater
-import javax.swing.JButton
-import javax.swing.JComboBox
-import javax.swing.JPanel
+import com.intellij.openapi.ui.DialogPanel
+import com.intellij.ui.EnumComboBoxModel
+import com.intellij.ui.dsl.builder.bindItem
+import com.intellij.ui.dsl.builder.panel
 
 class NbtToolbar(nbtFile: NbtVirtualFile) {
-    lateinit var panel: JPanel
-    private lateinit var compressionBox: JComboBox<CompressionSelection>
-    lateinit var saveButton: JButton
 
-    private var lastSelection: CompressionSelection
+    private var compressionSelection: CompressionSelection? =
+        if (nbtFile.isCompressed) CompressionSelection.GZIP else CompressionSelection.UNCOMPRESSED
+
+    val selection: CompressionSelection
+        get() = compressionSelection!!
+
+    lateinit var panel: DialogPanel
 
     init {
-        compressionBox.addItem(CompressionSelection.GZIP)
-        compressionBox.addItem(CompressionSelection.UNCOMPRESSED)
-        compressionBox.selectedItem =
-            if (nbtFile.isCompressed) CompressionSelection.GZIP else CompressionSelection.UNCOMPRESSED
-        lastSelection = selection
-
-        if (!nbtFile.isWritable || !nbtFile.parseSuccessful) {
-            compressionBox.isEnabled = false
-        }
-
-        if (!nbtFile.parseSuccessful) {
-            panel.isVisible = false
-        }
-
-        saveButton.addActionListener {
-            lastSelection = selection
-
-            runWriteTaskLater {
-                nbtFile.writeFile(this)
+        panel = panel {
+            row(MCDevBundle("nbt.compression.file_type.label")) {
+                comboBox(EnumComboBoxModel(CompressionSelection::class.java))
+                    .bindItem(::compressionSelection)
+                    .enabled(nbtFile.isWritable && nbtFile.parseSuccessful)
+                button(MCDevBundle("nbt.compression.save.button")) {
+                    panel.apply()
+                    runWriteTaskLater {
+                        nbtFile.writeFile(this)
+                    }
+                }
             }
+            visible(nbtFile.parseSuccessful)
         }
     }
-
-    val selection
-        get() = compressionBox.selectedItem as CompressionSelection
 }

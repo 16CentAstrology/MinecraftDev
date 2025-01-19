@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.util
@@ -64,7 +74,7 @@ class McPsiClassTest : OuterClassTest() {
     fun innerAnonymousInnerFullQualifiedNameTest() =
         Assertions.assertEquals(
             "com.example.test.OuterClass\$InnerClass$1\$AnonymousInnerClass",
-            innerAnonymousInnerClass.fullQualifiedName
+            innerAnonymousInnerClass.fullQualifiedName,
         )
 
     @Test
@@ -97,8 +107,8 @@ class McPsiClassTest : OuterClassTest() {
         assertEquivalent(
             innerAnonymousClass,
             findQualifiedClass(
-                "com.example.test.OuterClass\$InnerClass$1"
-            )
+                "com.example.test.OuterClass\$InnerClass$1",
+            ),
         )
 
     @Test
@@ -106,7 +116,7 @@ class McPsiClassTest : OuterClassTest() {
     fun innerAnonymousInnerFindTest() =
         assertEquivalent(
             innerAnonymousInnerClass,
-            findQualifiedClass("com.example.test.OuterClass\$InnerClass$1\$AnonymousInnerClass")
+            findQualifiedClass("com.example.test.OuterClass\$InnerClass$1\$AnonymousInnerClass"),
         )
 
     @Test
@@ -114,7 +124,7 @@ class McPsiClassTest : OuterClassTest() {
     fun selfReferencingGenericFullQualifiedNameTest() =
         Assertions.assertEquals(
             "com.example.test.OuterClass\$SelfReferencingGeneric",
-            selfReferencingGeneric.fullQualifiedName
+            selfReferencingGeneric.fullQualifiedName,
         )
 
     @Test

@@ -4,8 +4,8 @@ plugins {
 #if (${MIXINS})
 loom {
     forge {
-        mixinConfig "${ARTIFACT_ID}-common.mixins.json"
-        mixinConfig "${ARTIFACT_ID}.mixins.json"
+        mixinConfig "${MOD_ID}-common.mixins.json"
+        mixinConfig "${MOD_ID}.mixins.json"
     }
 }
 #end
@@ -16,7 +16,7 @@ architectury {
 
 configurations {
     common
-    shadowCommon // Don't use shadow from the shadow plugin because we don't want IDEA to index this.
+    shadowCommon // Don't use shadow from the shadow plugin since it *excludes* files.
     compileClasspath.extendsFrom common
     runtimeClasspath.extendsFrom common
     developmentForge.extendsFrom common
@@ -45,17 +45,17 @@ shadowJar {
     exclude "fabric.mod.json"
 
     configurations = [project.configurations.shadowCommon]
-    classifier "dev-shadow"
+    archiveClassifier = "dev-shadow"
 }
 
 remapJar {
-    input.set shadowJar.archiveFile
+    inputFile.set(shadowJar.archiveFile)
     dependsOn shadowJar
-    classifier null
+    archiveClassifier.set(null)
 }
 
 jar {
-    classifier "dev"
+    archiveClassifier.set("dev")
 }
 
 sourcesJar {

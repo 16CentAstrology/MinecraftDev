@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.action
@@ -64,7 +74,7 @@ class GenerateSoftImplementsAction : MixinCodeInsightAction() {
             return
         }
 
-        val chooser = MemberChooser<PsiMethodMember>(methods.keys.toTypedArray(), false, true, project)
+        val chooser = MemberChooser(methods.keys.toTypedArray(), false, true, project)
         chooser.title = "Select Methods to Soft-implement"
         chooser.show()
 
@@ -83,14 +93,14 @@ class GenerateSoftImplementsAction : MixinCodeInsightAction() {
                         method,
                         it.substitutor,
                         chooser.isCopyJavadoc,
-                        false
+                        false,
                     )
                         .map { m ->
                             // Apply prefix
                             m.name = prefix + m.name
                             OverrideImplementUtil.createGenerationInfo(m)
                         }
-                }
+                },
             ).firstOrNull()?.positionCaret(editor, true)
         }
     }

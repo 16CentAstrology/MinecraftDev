@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mcp.at
@@ -33,7 +43,7 @@ class AtGotoDeclarationHandler : GotoDeclarationHandler {
     override fun getGotoDeclarationTargets(
         sourceElement: PsiElement?,
         offset: Int,
-        editor: Editor
+        editor: Editor,
     ): Array<out PsiElement>? {
         if (sourceElement?.language !== AtLanguage) {
             return null
@@ -45,12 +55,12 @@ class AtGotoDeclarationHandler : GotoDeclarationHandler {
 
         val mcpModule = instance.getModuleOfType(McpModuleType) ?: return null
 
-        val srgMap = mcpModule.srgManager?.srgMapNow ?: return null
+        val srgMap = mcpModule.mappingsManager?.mappingsNow ?: return null
 
         return when {
             sourceElement.node.treeParent.elementType === AtTypes.CLASS_NAME -> {
                 val className = sourceElement.parent as AtClassName
-                val classSrgToMcp = srgMap.mapToMcpClass(className.classNameText)
+                val classSrgToMcp = srgMap.getMappedClass(className.classNameText)
                 val psiClass = findQualifiedClass(sourceElement.project, classSrgToMcp) ?: return null
                 arrayOf(psiClass)
             }
@@ -59,7 +69,7 @@ class AtGotoDeclarationHandler : GotoDeclarationHandler {
                 val function = funcName.parent as AtFunction
                 val entry = function.parent as AtEntry
 
-                val reference = srgMap.mapToMcpMethod(AtMemberReference.get(entry, function) ?: return null)
+                val reference = srgMap.getMappedMethod(AtMemberReference.get(entry, function) ?: return null)
                 val member = reference.resolveMember(sourceElement.project) ?: return null
                 arrayOf(member)
             }
@@ -67,12 +77,12 @@ class AtGotoDeclarationHandler : GotoDeclarationHandler {
                 val fieldName = sourceElement.parent as AtFieldName
                 val entry = fieldName.parent as AtEntry
 
-                val reference = srgMap.mapToMcpField(AtMemberReference.get(entry, fieldName) ?: return null)
+                val reference = srgMap.getMappedField(AtMemberReference.get(entry, fieldName) ?: return null)
                 val member = reference.resolveMember(sourceElement.project) ?: return null
                 arrayOf(member)
             }
             sourceElement.node.elementType === AtTypes.CLASS_VALUE -> {
-                val className = srgMap.mapToMcpClass(parseClassDescriptor(sourceElement.text))
+                val className = srgMap.getMappedClass(parseClassDescriptor(sourceElement.text))
                 val psiClass = findQualifiedClass(sourceElement.project, className) ?: return null
                 arrayOf(psiClass)
             }
@@ -88,7 +98,7 @@ class AtGotoDeclarationHandler : GotoDeclarationHandler {
 
                 val psiClass = JavaPsiFacade.getInstance(sourceElement.project).findClass(
                     boxedType,
-                    GlobalSearchScope.allScope(sourceElement.project)
+                    GlobalSearchScope.allScope(sourceElement.project),
                 ) ?: return null
                 arrayOf(psiClass)
             }

@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.inspection
@@ -15,6 +25,7 @@ import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.INVOKER
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.OVERWRITE
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.SHADOW
 import com.demonwav.mcdev.platform.mixin.util.isMixin
+import com.demonwav.mcdev.util.findKeyword
 import com.intellij.codeInsight.intention.QuickFixFactory
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.JavaElementVisitor
@@ -27,7 +38,7 @@ import com.intellij.psi.PsiModifier
 class StaticMemberInspection : MixinInspection() {
 
     override fun getStaticDescription() =
-        "A mixin class does not exist at runtime, and thus having them public does not make sense. " +
+        "A mixin class does not exist at runtime, and thus having them not private does not make sense. " +
             "Make the field/method private instead."
 
     override fun buildVisitor(holder: ProblemsHolder): PsiElementVisitor = Visitor(holder)
@@ -44,10 +55,16 @@ class StaticMemberInspection : MixinInspection() {
 
         private fun visitMember(member: PsiMember) {
             if (isProblematic(member)) {
+                val accessModifier = when {
+                    member.hasModifierProperty(PsiModifier.PUBLIC) -> PsiModifier.PUBLIC
+                    member.hasModifierProperty(PsiModifier.PROTECTED) -> PsiModifier.PROTECTED
+                    member.hasModifierProperty(PsiModifier.PRIVATE) -> PsiModifier.PRIVATE
+                    else -> PsiModifier.PACKAGE_LOCAL
+                }
                 holder.registerProblem(
-                    member,
-                    "Public static members are not allowed in Mixin classes",
-                    QuickFixFactory.getInstance().createModifierListFix(member, PsiModifier.PRIVATE, true, false)
+                    member.modifierList?.findKeyword(accessModifier) ?: member,
+                    "Non-private static members are not allowed in Mixin classes",
+                    QuickFixFactory.getInstance().createModifierListFix(member, PsiModifier.PRIVATE, true, false),
                 )
             }
         }
@@ -60,7 +77,7 @@ class StaticMemberInspection : MixinInspection() {
 
             val modifiers = member.modifierList!!
 
-            return modifiers.hasModifierProperty(PsiModifier.PUBLIC) &&
+            return !modifiers.hasModifierProperty(PsiModifier.PRIVATE) &&
                 modifiers.hasModifierProperty(PsiModifier.STATIC) &&
                 modifiers.findAnnotation(SHADOW) == null &&
                 modifiers.findAnnotation(OVERWRITE) == null &&

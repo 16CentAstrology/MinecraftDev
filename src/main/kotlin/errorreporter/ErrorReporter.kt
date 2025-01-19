@@ -1,17 +1,27 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.errorreporter
 
+import com.demonwav.mcdev.asset.MCDevBundle
 import com.demonwav.mcdev.update.PluginUtil
-import com.intellij.diagnostic.DiagnosticBundle
 import com.intellij.diagnostic.LogMessage
 import com.intellij.ide.DataManager
 import com.intellij.ide.plugins.PluginManagerCore
@@ -33,15 +43,17 @@ import java.awt.Component
 class ErrorReporter : ErrorReportSubmitter() {
     private val ignoredErrorMessages = listOf(
         "Key com.demonwav.mcdev.translations.TranslationFoldingSettings duplicated",
-        "Inspection #EntityConstructor has no description"
+        "Inspection #EntityConstructor has no description",
+        "VFS name enumerator corrupted",
+        "PersistentEnumerator storage corrupted",
     )
-    override fun getReportActionText() = "Report to Minecraft Dev GitHub Issue Tracker"
+    override fun getReportActionText() = MCDevBundle("error_reporter.submit.action")
 
     override fun submit(
         events: Array<out IdeaLoggingEvent>,
         additionalInfo: String?,
         parentComponent: Component,
-        consumer: Consumer<in SubmittedReportInfo>
+        consumer: Consumer<in SubmittedReportInfo>,
     ): Boolean {
         val dataContext = DataManager.getInstance().getDataContext(parentComponent)
         val project = CommonDataKeys.PROJECT.getData(dataContext)
@@ -49,7 +61,7 @@ class ErrorReporter : ErrorReportSubmitter() {
         val event = events[0]
         val errorMessage = event.throwableText
         if (errorMessage.isNotBlank() && ignoredErrorMessages.any(errorMessage::contains)) {
-            val task = object : Task.Backgroundable(project, "Ignored error") {
+            val task = object : Task.Backgroundable(project, MCDevBundle("error_reporter.submit.ignored")) {
                 override fun run(indicator: ProgressIndicator) {
                     consumer.consume(SubmittedReportInfo(null, null, SubmittedReportInfo.SubmissionStatus.DUPLICATE))
                 }
@@ -95,37 +107,37 @@ class ErrorReporter : ErrorReportSubmitter() {
                 }
 
                 val message = if (!isDuplicate) {
-                    "<html>Created Issue #$token successfully."
+                    "<html>${MCDevBundle("error_reporter.report.created", token)}</html>"
                 } else {
-                    "<html>Commented on existing Issue #$token successfully."
+                    "<html>${MCDevBundle("error_reporter.report.commented", token)}</html>"
                 }
                 val actionText = if (!isDuplicate) {
-                    "View issue"
+                    MCDevBundle("error_reporter.report.created.action")
                 } else {
-                    "View comment"
+                    MCDevBundle("error_reporter.report.commented.action")
                 }
 
                 NotificationGroupManager.getInstance().getNotificationGroup("Error Report").createNotification(
-                    DiagnosticBundle.message("error.report.title"),
+                    MCDevBundle("error_reporter.report.title"),
                     message,
-                    NotificationType.INFORMATION
+                    NotificationType.INFORMATION,
                 ).addAction(BrowseNotificationAction(actionText, htmlUrl)).setImportant(false).notify(project)
 
                 val reportInfo = SubmittedReportInfo(htmlUrl, "Issue #$token", type)
                 consumer.consume(reportInfo)
             },
             { e ->
-                val message = "<html>Error Submitting Issue: ${e.message}</html>."
-                val actionText = "Open an issue on the GitHub issue tracker"
+                val message = "<html>${MCDevBundle("error_reporter.report.error", e.message)}</html>"
+                val actionText = MCDevBundle("error_reporter.report.error.action")
                 val userUrl = "https://github.com/minecraft-dev/MinecraftDev/issues"
                 NotificationGroupManager.getInstance().getNotificationGroup("Error Report").createNotification(
-                    DiagnosticBundle.message("error.report.title"),
+                    MCDevBundle("error_reporter.report.title"),
                     message,
                     NotificationType.ERROR,
                 ).addAction(BrowseNotificationAction(actionText, userUrl)).setImportant(false).notify(project)
 
                 consumer.consume(SubmittedReportInfo(null, null, SubmittedReportInfo.SubmissionStatus.FAILED))
-            }
+            },
         )
 
         if (project == null) {

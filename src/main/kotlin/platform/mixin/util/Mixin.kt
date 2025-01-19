@@ -1,22 +1,33 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.util
 
 import com.demonwav.mcdev.platform.mixin.action.FindMixinsAction
+import com.demonwav.mcdev.platform.mixin.handlers.MixinAnnotationHandler
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.ACCESSOR
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.INVOKER
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.MIXIN
-import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Classes.ARGS
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Classes.CALLBACK_INFO
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Classes.CALLBACK_INFO_RETURNABLE
+import com.demonwav.mcdev.platform.mixin.util.MixinConstants.MixinExtras.OPERATION
 import com.demonwav.mcdev.util.cached
 import com.demonwav.mcdev.util.computeStringArray
 import com.demonwav.mcdev.util.findModule
@@ -30,11 +41,15 @@ import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiDisjunctionType
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiIntersectionType
+import com.intellij.psi.PsiMethod
+import com.intellij.psi.PsiParameter
 import com.intellij.psi.PsiPrimitiveType
 import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.InheritanceUtil
 import com.intellij.psi.util.PsiModificationTracker
+import com.intellij.psi.util.TypeConversionUtil
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.ClassNode
 
@@ -80,7 +95,7 @@ val PsiClass.mixinTargets: List<ClassNode>
                     findClassNodeByQualifiedName(
                         project,
                         findModule(),
-                        name.replace('/', '.')
+                        name.replace('/', '.'),
                     )
                 }
             classTargets
@@ -121,6 +136,11 @@ val PsiClass.isAccessorMixin: Boolean
         return targets.isNotEmpty() && !targets.any { it.hasAccess(Opcodes.ACC_INTERFACE) }
     }
 
+val PsiParameter.isMixinExtrasSugar: Boolean
+    get() {
+        return annotations.any { it.qualifiedName?.contains(".mixinextras.sugar.") == true }
+    }
+
 fun callbackInfoType(project: Project): PsiType =
     PsiType.getTypeByName(CALLBACK_INFO, project, GlobalSearchScope.allScope(project))
 
@@ -131,17 +151,23 @@ fun callbackInfoReturnableType(project: Project, context: PsiElement, returnType
         returnType
     }
 
-    // TODO: Can we do this without looking up the PsiClass?
-    val psiClass =
-        JavaPsiFacade.getInstance(project).findClass(CALLBACK_INFO_RETURNABLE, GlobalSearchScope.allScope(project))
-            ?: return null
-    return JavaPsiFacade.getElementFactory(project).createType(psiClass, boxedType)
+    return JavaPsiFacade.getElementFactory(project)
+        .createTypeFromText("$CALLBACK_INFO_RETURNABLE<${boxedType.canonicalText}>", context)
 }
 
-fun argsType(project: Project): PsiType =
-    PsiType.getTypeByName(ARGS, project, GlobalSearchScope.allScope(project))
+fun mixinExtrasOperationType(context: PsiElement, type: PsiType): PsiType? {
+    val project = context.project
+    val boxedType = if (type is PsiPrimitiveType) {
+        type.getBoxedType(context) ?: return null
+    } else {
+        type
+    }
 
-fun isAssignable(left: PsiType, right: PsiType): Boolean {
+    return JavaPsiFacade.getElementFactory(project)
+        .createTypeFromText("$OPERATION<${boxedType.canonicalText}>", context)
+}
+
+fun isAssignable(left: PsiType, right: PsiType, allowPrimitiveConversion: Boolean = true): Boolean {
     return when {
         left is PsiIntersectionType -> left.conjuncts.all { isAssignable(it, right) }
         right is PsiIntersectionType -> right.conjuncts.any { isAssignable(left, it) }
@@ -150,21 +176,46 @@ fun isAssignable(left: PsiType, right: PsiType): Boolean {
         left is PsiArrayType -> right is PsiArrayType && isAssignable(left.componentType, right.componentType)
         else -> {
             if (left !is PsiClassType || right !is PsiClassType) {
-                return false
+                if (right == PsiTypes.nullType() && left !is PsiPrimitiveType) {
+                    return true
+                }
+                if (!allowPrimitiveConversion && (left is PsiPrimitiveType || right is PsiPrimitiveType)) {
+                    return left == right
+                }
+                return TypeConversionUtil.isAssignable(left, right)
             }
             val leftClass = left.resolve() ?: return false
             val rightClass = right.resolve() ?: return false
-            if (rightClass.isMixin) {
-                val isMixinAssignable = rightClass.mixinTargets.any {
-                    val stubClass = it.findStubClass(rightClass.project) ?: return@any false
-                    isClassAssignable(leftClass, stubClass)
+
+            val isLeftMixin = leftClass.isMixin
+            val isRightMixin = rightClass.isMixin
+            if (isLeftMixin || isRightMixin) {
+                fun getClassesToTest(clazz: PsiClass, isMixin: Boolean) = if (isMixin) {
+                    clazz.mixinTargets.mapNotNull { it.findStubClass(clazz.project) }
+                } else {
+                    listOf(clazz)
                 }
+
+                val leftClassesToTest = getClassesToTest(leftClass, isLeftMixin)
+                val rightClassesToTest = getClassesToTest(rightClass, isRightMixin)
+
+                val isMixinAssignable = leftClassesToTest.any { leftToTest ->
+                    rightClassesToTest.any { rightToTest ->
+                        isClassAssignable(leftToTest, rightToTest)
+                    }
+                }
+
                 if (isMixinAssignable) {
                     return true
                 }
             }
+
             val mixins = FindMixinsAction.findMixins(rightClass, rightClass.project) ?: return false
-            return mixins.any { isClassAssignable(leftClass, it) }
+            if (mixins.any { isClassAssignable(leftClass, it) }) {
+                return true
+            }
+
+            return isClassAssignable(leftClass, rightClass)
         }
     }
 }
@@ -172,7 +223,7 @@ fun isAssignable(left: PsiType, right: PsiType): Boolean {
 private fun isClassAssignable(leftClass: PsiClass, rightClass: PsiClass): Boolean {
     var result = false
     InheritanceUtil.processSupers(rightClass, true) {
-        if (it == leftClass) {
+        if (it.qualifiedName == leftClass.qualifiedName) {
             result = true
             false
         } else {
@@ -181,3 +232,21 @@ private fun isClassAssignable(leftClass: PsiClass, rightClass: PsiClass): Boolea
     }
     return result
 }
+
+fun isMixinEntryPoint(element: PsiElement?): Boolean {
+    if (element !is PsiMethod) {
+        return false
+    }
+    val project = element.project
+    for (annotation in element.annotations) {
+        val qName = annotation.qualifiedName ?: continue
+        val handler = MixinAnnotationHandler.forMixinAnnotation(qName, project)
+        if (handler != null && handler.isEntryPoint) {
+            return true
+        }
+    }
+    return false
+}
+
+val PsiElement.isFabricMixin: Boolean get() =
+    JavaPsiFacade.getInstance(project).findClass(MixinConstants.Classes.FABRIC_UTIL, resolveScope) != null

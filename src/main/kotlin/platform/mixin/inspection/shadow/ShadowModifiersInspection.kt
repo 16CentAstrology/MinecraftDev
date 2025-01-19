@@ -1,11 +1,21 @@
 /*
- * Minecraft Dev for IntelliJ
+ * Minecraft Development for IntelliJ
  *
- * https://minecraftdev.org
+ * https://mcdev.io/
  *
- * Copyright (c) 2023 minecraft-dev
+ * Copyright (C) 2025 minecraft-dev
  *
- * MIT License
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, version 3.0 only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package com.demonwav.mcdev.platform.mixin.inspection.shadow
@@ -70,8 +80,8 @@ class ShadowModifiersInspection : MixinInspection() {
                         shadowModifierList,
                         PsiModifier.STATIC,
                         targetStatic,
-                        false
-                    )
+                        false,
+                    ),
                 )
             }
 
@@ -85,12 +95,18 @@ class ShadowModifiersInspection : MixinInspection() {
                     shadowModifierList.findKeyword(shadowModifier) ?: annotation,
                     "Invalid access modifiers, has: $shadowModifier, but target member has: " +
                         PsiUtil.getAccessModifier(targetAccessLevel),
-                    QuickFixFactory.getInstance().createModifierListFix(shadowModifierList, targetModifier, true, false)
+                    QuickFixFactory.getInstance()
+                        .createModifierListFix(shadowModifierList, targetModifier, true, false)
                 )
             }
 
             // TODO: Would it make sense to apply the @Final check to methods?
             if (member !is PsiField) {
+                return
+            }
+
+            // @Final annotation doesn't apply to members that are initialized in the mixin class
+            if (member.hasInitializer()) {
                 return
             }
 
@@ -102,13 +118,13 @@ class ShadowModifiersInspection : MixinInspection() {
                     holder.registerProblem(
                         annotation,
                         "@Shadow for final member should be annotated as @Final",
-                        AddAnnotationFix(FINAL, member)
+                        AddAnnotationFix(FINAL, member),
                     )
                 } else {
                     holder.registerProblem(
                         shadowFinal!!,
                         "Target method is not final",
-                        RemoveAnnotationQuickFix(shadowFinal, member)
+                        RemoveAnnotationQuickFix(shadowFinal, member),
                     )
                 }
             }
