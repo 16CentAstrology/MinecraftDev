@@ -42,6 +42,9 @@ class LocalInfo(
     val ordinal: Int?,
     val names: Set<String>,
 ) {
+    val isImplicit: Boolean
+        get() = index == null && ordinal == null && names.isEmpty()
+
     private fun getLocals(
         module: Module,
         targetClass: ClassNode,

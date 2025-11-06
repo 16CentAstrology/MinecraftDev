@@ -20,20 +20,21 @@
 
 package com.demonwav.mcdev.platform.mixin.inspection.mixinextras
 
+import com.demonwav.mcdev.platform.mixin.handlers.InjectorAnnotationHandler
 import com.demonwav.mcdev.platform.mixin.handlers.MixinAnnotationHandler
 import com.demonwav.mcdev.platform.mixin.inspection.MixinInspection
 import com.demonwav.mcdev.platform.mixin.inspection.fix.AnnotationAttributeFix
 import com.demonwav.mcdev.platform.mixin.inspection.injector.ModifyVariableArgsOnlyInspection
-import com.demonwav.mcdev.platform.mixin.util.MethodTargetMember
+import com.demonwav.mcdev.platform.mixin.util.LocalInfo
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants
 import com.demonwav.mcdev.platform.mixin.util.unwrapLocalRef
 import com.demonwav.mcdev.util.constantValue
-import com.demonwav.mcdev.util.findContainingMethod
-import com.demonwav.mcdev.util.ifEmpty
+import com.demonwav.mcdev.util.mapFirstNotNull
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.JavaElementVisitor
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiElementVisitor
+import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiParameter
 import com.intellij.psi.util.parentOfType
 
@@ -50,17 +51,16 @@ class LocalArgsOnlyInspection : MixinInspection() {
                 return
             }
             val parameter = localAnnotation.parentOfType<PsiParameter>() ?: return
-            val method = parameter.findContainingMethod() ?: return
+            val method = parameter.declarationScope as? PsiMethod ?: return
 
-            val targets = method.annotations.flatMap { annotation ->
-                MixinAnnotationHandler.resolveTarget(annotation).asSequence()
-                    .filterIsInstance<MethodTargetMember>()
-                    .map { it.classAndMethod }
-            }.ifEmpty { return }
+            val (injector, injectorAnnotation) = method.annotations.mapFirstNotNull { annotation ->
+                (MixinAnnotationHandler.forMixinAnnotation(annotation, holder.project) as? InjectorAnnotationHandler)?.let { it to annotation }
+            } ?: return
 
             val localType = parameter.type.unwrapLocalRef()
+            val localInfo = LocalInfo.fromAnnotation(localType, localAnnotation)
 
-            if (ModifyVariableArgsOnlyInspection.shouldReport(localAnnotation, localType, targets.asSequence())) {
+            if (ModifyVariableArgsOnlyInspection.shouldReport(localInfo, injector, injectorAnnotation)) {
                 holder.registerProblem(
                     localAnnotation.nameReferenceElement ?: localAnnotation,
                     "@Local may be argsOnly = true",

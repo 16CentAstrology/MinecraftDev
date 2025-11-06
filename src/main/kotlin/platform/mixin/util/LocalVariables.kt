@@ -805,7 +805,7 @@ object LocalVariables {
                             localType.descriptor
                         }
                     }
-                    localVars[j] = LocalVariable("var$j", desc, null, i, null, j)
+                    localVars[j] = LocalVariable("var$j", desc, null, i, null, j, isNamed = false)
                     if (desc != null) {
                         lastKnownType[j] = desc
                     }
@@ -881,6 +881,7 @@ object LocalVariables {
         val start: Int?,
         var end: Int?,
         val index: Int,
+        val isNamed: Boolean = true,
     ) {
         fun isInRange(index: Int): Boolean {
             val end = this.end
@@ -904,6 +905,7 @@ object LocalVariables {
         ancestor.start,
         ancestor.end,
         ancestor.index,
+        ancestor.isNamed,
     ) {
         var lifetime = 0
         var frames = 0
